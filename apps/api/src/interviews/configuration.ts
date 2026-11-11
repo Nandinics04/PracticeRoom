@@ -14,7 +14,6 @@ export function toInterviewConfiguration(
         if(!input.company.trim() || !input.role.trim() || !input.description.trim()){
             throw new Error("Company, role, and description are required");
         }
-    
         return{
             mode: "job",
             interviewType: input.interviewType,
