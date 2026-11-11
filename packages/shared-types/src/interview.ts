@@ -52,3 +52,15 @@ export type InterviewConfiguration={
     round?: string;
     job?: JobContent;
 }
+
+export type PublicPlatform="leetcode" | "glassdoor" | "geeksforgeeks"| "medium"| "reddit"| "linkedin" | "AmbitionBox" | "ziprecruiter" | "stackoverflow" | "github" | "IGotAnOffer" | "Blind"| "CareerCup" | "company_site";
+export type ResearchSource={
+    platform: PublicPlatform;
+    title: string;
+    url: string;
+    excerpt: string;
+};
+export type ResearchQuery={
+    platform: PublicPlatform;
+    query: string;
+}

@@ -9,4 +9,7 @@ export type{
     SessionEvent,
     JobInterviewInput,
     SkillInterviewInput,
+    PublicPlatform,
+    ResearchSource,
+    ResearchQuery,
 } from "./interview";
