@@ -16,6 +16,28 @@ export type JobContent={
     description: string;
     url?: string;
 };
+export type JobInterviewInput={
+    mode: "job";
+    company: string;
+    role: string;
+    description: string;
+    url?:string;
+    round?:string;
+    interviewType: InterviewType;
+    experienceLevel: ExperienceLevel;
+    difficulty: Difficulty;
+    durationMinutes: number;
+    focusAreas?: string[];
+};
+export type SkillInterviewInput={
+    mode: "skill";
+    skills: string[];
+    interviewType: InterviewType;
+    experienceLevel: ExperienceLevel;
+    difficulty: Difficulty;
+    durationMinutes: number;
+    focusAreas?: string[];
+}
 export type InterviewStatus= "draft" | "preparing" | "ready" | "live" | "completed" | "report_ready" | "failed";
 export type SessionEvent="prepare"| "plan_ready" | "start"| "end" | "report_ready" | "fail";
 

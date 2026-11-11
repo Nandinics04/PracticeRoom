@@ -7,4 +7,6 @@ export type{
     InterviewConfiguration,
     InterviewStatus,
     SessionEvent,
+    JobInterviewInput,
+    SkillInterviewInput,
 } from "./interview";
