@@ -64,3 +64,19 @@ export type ResearchQuery={
     platform: PublicPlatform;
     query: string;
 }
+export type PlanQuestion={
+    prompt: string;
+    rubric: string;
+    sourceUrls: string[];
+};
+export type PlanSection={
+    name: string;
+    minutes: number;
+    questions: PlanQuestion[];
+};
+export type InterviewPlan={
+    title: string;
+    totalMinutes: number;
+    sections: PlanSection[];
+    sourceUrls: string[];
+};

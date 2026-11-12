@@ -12,4 +12,7 @@ export type{
     PublicPlatform,
     ResearchSource,
     ResearchQuery,
+    PlanQuestion,
+    PlanSection,
+    InterviewPlan,
 } from "./interview";
