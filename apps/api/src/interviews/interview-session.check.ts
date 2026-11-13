@@ -48,7 +48,12 @@ session.answer(longAnswer);
 session.answer(longAnswer);
 const finished = session.answer(longAnswer);
 assert.equal(finished.done, true);
-assert.equal(session.status, "completed");
+assert.equal(session.status, "completed");const feedback = session.report();
+assert.equal(session.status, "report_ready");
+assert.equal(feedback.practiceTopics.includes("Background"), true);
+assert.throws(() => session.report());
 assert.throws(() => session.answer(longAnswer));
+
+
 
 console.log("interview session ok");

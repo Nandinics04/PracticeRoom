@@ -80,3 +80,27 @@ export type InterviewPlan={
     sections: PlanSection[];
     sourceUrls: string[];
 };
+export type ScoreConfidence = "low" | "high"
+
+export type FeedbackCriterionName=
+| "technical_accuracy"
+| "problem_solving"
+| "communication_clarity"
+| "answer_relevance"
+|"completeness";
+
+export type FeedbackCriterion={
+    name: FeedbackCriterionName;
+    score: number;
+    evidence: string;
+    explanation: string;
+    confidence: ScoreConfidence;
+};
+
+export type InterviewFeedback={
+    overallScore: number;
+    criteria: FeedbackCriterion[];
+    strengths: string[];
+    improvements:string[];
+    practiceTopics: string[];
+}

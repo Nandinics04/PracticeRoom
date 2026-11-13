@@ -1,9 +1,10 @@
-import type { InterviewConfiguration, InterviewPlan, InterviewStatus }  from "@practice-room/shared-types";
+import type { InterviewConfiguration, InterviewPlan, InterviewStatus, InterviewFeedback }  from "@practice-room/shared-types";
 import {firstQuestion, nextTurn, type InterviewCursor, type InterviewTurn} from "./interviewer.ts";
 import {buildInterviewPlan} from "./plan.ts";
 import { runPublicResearch } from "./research-service.ts";
 import type { SearchProvider } from "./search-provider.ts";
 import { SessionStateMachine } from "./session-state.ts";
+import { buildFeedback } from "./feedback.ts";
 
 export type TranscriptEntry={
     sectionName: string;
@@ -21,7 +22,6 @@ export class InterviewSession{
     private constructor(config: InterviewConfiguration){
         this.config=config;
     }
-
     static create(config: InterviewConfiguration){
         return new InterviewSession(config);
     }
@@ -60,6 +60,15 @@ export class InterviewSession{
             answer: "", 
         });
         return result.turn;
+    }
+
+    report(): InterviewFeedback{
+        if(this.status!=="completed"){
+            throw new Error("Finish the interview before generating a report")
+        }
+        const feedback=buildFeedback(this.transcript);
+        this.status=this.machine.transition(this.status, "report_ready");
+        return feedback;
     }
 }
 

@@ -15,4 +15,8 @@ export type{
     PlanQuestion,
     PlanSection,
     InterviewPlan,
+    ScoreConfidence,
+    FeedbackCriterionName,
+    FeedbackCriterion,
+    InterviewFeedback,
 } from "./interview";

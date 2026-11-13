@@ -17,6 +17,27 @@ This README covers the work completed so far. The interview engine runs in memor
 
 A technical interview has three sections: Background, Core concepts, and Follow-ups. A short answer stays in the current section. Each later answer moves one section forward. The interview is finished only after the candidate answers the last section.
 
+## Session state machine
+
+`SessionStateMachine` is the only code that changes an interview's status. Any event that is not drawn here throws.
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> preparing: prepare
+  preparing --> ready: plan_ready
+  preparing --> failed: fail
+  ready --> live: start
+  ready --> failed: fail
+  live --> completed: end
+  live --> failed: fail
+  completed --> report_ready: report_ready
+  report_ready --> [*]
+  failed --> [*]
+```
+
+`prepare` runs research and builds the plan. `plan_ready` means the plan exists. `start` asks the first question. `end` is the answer to the last section. `report_ready` is the feedback report. `failed` is allowed from preparation, from the ready plan, or from the live interview. `report_ready` and `failed` have no further moves.
+
 ## Repository layout
 
 ```text
@@ -26,12 +47,23 @@ PracticeRoom/
 ├── apps/web/                         React app, not started
 ├── apps/ai-service/                  FastAPI agents, not started
 ├── packages/shared-types/            Types shared by the web app and the API
-├── docs/                             Design notes, not written yet
+├── docs/                             PRD, HLD, LLD, API, data, and decisions
 ├── package.json                      Workspace root
 └── pnpm-workspace.yaml               Lists the Node packages
 ```
 
 `apps/ai-service` is Python, so it is not part of the pnpm workspace.
+
+## Design documents
+
+| Document | What it records |
+|---|---|
+| [docs/requirements/prd.md](docs/requirements/prd.md) | Candidate flows, interview rules, and feedback rules that are implemented |
+| [docs/architecture/hld.md](docs/architecture/hld.md) | Workspace, session flow, and which services are not running yet |
+| [docs/lld/interview.md](docs/lld/interview.md) | Status machine, research queries, plan timing, turns, and scoring |
+| [docs/api/http.md](docs/api/http.md) | `GET /api/v1/health`, and the interview routes that are not registered |
+| [docs/database/schema.md](docs/database/schema.md) | The in-memory session, and the tables planned for later |
+| [docs/decisions](docs/decisions) | Why the session is in memory, why search is a provider, and why scores quote answers |
 
 ## Setup
 
