@@ -2,24 +2,24 @@ import assert from "node:assert/strict";
 import { toInterviewConfiguration } from "./configuration.ts";
 import { InterviewSession } from "./interview-session.ts";
 import { MockSearchProvider } from "./search-provider.ts";
+import { prepareInterview } from "../application/interview/prepare-interview.ts";
+
 
 const longAnswer = "React stores component state and rerenders when that state changes.";
 
-const skill = await InterviewSession.create(
-  toInterviewConfiguration({
+const skillConfig = toInterviewConfiguration({
     mode: "skill",
     skills: ["React"],
     interviewType: "technical",
     experienceLevel: "entry",
     difficulty: "medium",
     durationMinutes: 45,
-  }),
-).prepare(new MockSearchProvider());
+  });
+const skillSession=await prepareInterview(skillConfig,  new MockSearchProvider());
+assert.equal(skillSession.status, "ready");
+assert.equal(skillSession.plan?.sourceUrls.length, 0);
 
-assert.equal(skill.sourceUrls.length, 0);
-
-const session = InterviewSession.create(
-  toInterviewConfiguration({
+const jobConfig =  toInterviewConfiguration({
     mode: "job",
     company: "Google",
     role: "Software Engineer",
@@ -28,13 +28,16 @@ const session = InterviewSession.create(
     experienceLevel: "entry",
     difficulty: "medium",
     durationMinutes: 45,
-  }),
-);
+  });
+const unprepared=InterviewSession.create(jobConfig);
+assert.throws(() => unprepared.start());
 
-assert.throws(() => session.start());
-const plan = await session.prepare(new MockSearchProvider());
-assert.equal(session.status, "ready");
-assert.equal(plan.sourceUrls.length > 0, true);
+
+const session=await prepareInterview(jobConfig, new MockSearchProvider());
+assert.equal(session.status, "ready")
+assert.equal((session.plan?.sourceUrls.length ?? 0)>0, true);
+
+
 
 const opening = session.start();
 assert.equal(session.status, "live");

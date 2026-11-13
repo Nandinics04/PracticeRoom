@@ -1,8 +1,5 @@
 import type { InterviewConfiguration, InterviewPlan, InterviewStatus, InterviewFeedback }  from "@practice-room/shared-types";
 import {firstQuestion, nextTurn, type InterviewCursor, type InterviewTurn} from "./interviewer.ts";
-import {buildInterviewPlan} from "./plan.ts";
-import { runPublicResearch } from "./research-service.ts";
-import type { SearchProvider } from "./search-provider.ts";
 import { SessionStateMachine } from "./session-state.ts";
 import { buildFeedback } from "./feedback.ts";
 
@@ -25,11 +22,10 @@ export class InterviewSession{
     static create(config: InterviewConfiguration){
         return new InterviewSession(config);
     }
-    async prepare(provider: SearchProvider){
-        this.status=this.machine.transition(this.status, "prepare");
-        const sources=await runPublicResearch(this.config, provider);
-        this.plan=buildInterviewPlan(this.config, sources);
-        this.status=this.machine.transition(this.status, "plan_ready");
+    ready(plan: InterviewPlan){
+        this.status=this.machine.transition(this.status,"prepare");
+        this.plan=plan;
+        this.status=this.machine.transition(this.status,"plan_ready");
         return this.plan;
     }
 
