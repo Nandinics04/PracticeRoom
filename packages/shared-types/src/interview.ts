@@ -68,6 +68,7 @@ export type PlanQuestion={
     prompt: string;
     rubric: string;
     sourceUrls: string[];
+    followUpPrompt?: string;
 };
 export type PlanSection={
     name: string;

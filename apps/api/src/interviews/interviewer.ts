@@ -33,7 +33,7 @@ export function nextTurn(
             cursor: {sectionIndex: cursor.sectionIndex, followUpUsed: true},
             turn:{
                 sectionName: section.name,
-                prompt: `Go deeper on ${section.name}. Add an example.`,
+                prompt: section.questions[0].followUpPrompt ?? "",
                 done: false,
             },
         };

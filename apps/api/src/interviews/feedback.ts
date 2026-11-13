@@ -4,7 +4,7 @@ import type {
     InterviewFeedback,
     ScoreConfidence,
 } from "@practice-room/shared-types";
-import type { TranscriptEntry } from "./interview-session.ts";
+import type { TranscriptEntry } from "./interview-session";
 
 const criterionNames: FeedbackCriterionName[]=["technical_accuracy", "problem_solving", "communication_clarity", "answer_relevance", "completeness"];
 const shortAnswerLimit=40;

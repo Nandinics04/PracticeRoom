@@ -1,5 +1,5 @@
 import type {InterviewConfiguration, InterviewPlan, PlanSection, ResearchSource,} from "@practice-room/shared-types";
-import {interviewStrategyFor} from "./interview-strategy.ts";
+import {interviewStrategyFor} from "./interview-strategy";
 
 
 
@@ -7,7 +7,8 @@ export function buildInterviewPlan(
     config: InterviewConfiguration,
     sources: ResearchSource[],
 ): InterviewPlan {
-    const names=interviewStrategyFor(config.interviewType).sectionNames();
+    const strategy=interviewStrategyFor(config.interviewType);
+    const names=strategy.sectionNames();
     const base= Math.floor(config.durationMinutes / names.length);
     const remainder=config.durationMinutes % names.length;
     const sourceUrls=sources.map((source)=>source.url);
@@ -23,6 +24,7 @@ export function buildInterviewPlan(
                     prompt: `Discuss ${name.toLowerCase()}for ${topic}. Use the job requirements and the public preparation sources.`,
                     rubric: `Score accuracy, problem-solving, clarity, and relevance at ${config.experienceLevel} level and ${config.difficulty} difficulty.`,
                     sourceUrls:sourceUrls.slice(0,2),
+                    followUpPrompt: strategy.followUp(name),
                 },
             ],
         };

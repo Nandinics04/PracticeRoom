@@ -1,6 +1,6 @@
 import type {InterviewConfiguration, ResearchSource} from "@practice-room/shared-types"
-import {buildResearchQueries} from "./research.ts";
-import type {SearchProvider} from "./search-provider.ts";
+import {buildResearchQueries} from "./research";
+import type {SearchProvider} from "./search-provider";
 
 export async function runPublicResearch(
     config: InterviewConfiguration,

@@ -1,7 +1,7 @@
 import type { InterviewConfiguration, InterviewPlan, InterviewStatus, InterviewFeedback }  from "@practice-room/shared-types";
-import {firstQuestion, nextTurn, type InterviewCursor, type InterviewTurn} from "./interviewer.ts";
-import { SessionStateMachine } from "./session-state.ts";
-import { buildFeedback } from "./feedback.ts";
+import {firstQuestion, nextTurn, type InterviewCursor, type InterviewTurn} from "./interviewer";
+import { SessionStateMachine } from "./session-state";
+import { buildFeedback } from "./feedback";
 
 export type TranscriptEntry={
     sectionName: string;
