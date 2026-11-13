@@ -16,7 +16,126 @@ InterviewSession
         +-- buildFeedback
 ```
 
-`InterviewSession` is the aggregate. Its public methods are `create`, `prepare`, `start`, `answer`, and `report`. The constructor is private. Callers use `InterviewSession.create`.
+`InterviewSession` is the aggregate. Its public methods are `create`, `ready`, `start`, `answer`, and `report`. The constructor is private. Callers use `InterviewSession.create`. `prepareInterview` is the use case that searches, builds the plan, and calls `ready`.
+
+## Class diagram
+
+```mermaid
+classDiagram
+  class InterviewsController {
+    +create(body)
+  }
+  class SessionStore {
+    -sessions
+    +save(id, session)
+    +get(id) InterviewSession
+  }
+  class prepareInterview {
+    <<use case>>
+    +run(config, provider) InterviewSession
+  }
+  class toInterviewConfiguration {
+    <<function>>
+    +map(input) InterviewConfiguration
+  }
+  class InterviewSession {
+    +status
+    +plan
+    +transcript
+    -cursor
+    -machine
+    -config
+    +create(config) InterviewSession
+    +ready(plan) InterviewPlan
+    +start() InterviewTurn
+    +answer(text) InterviewTurn
+    +report() InterviewFeedback
+  }
+  class SessionStateMachine {
+    +transition(from, event) InterviewStatus
+  }
+  class InterviewConfiguration {
+    +mode
+    +interviewType
+    +experienceLevel
+    +difficulty
+    +durationMinutes
+    +skills
+    +job
+  }
+  class InterviewPlan {
+    +title
+    +totalMinutes
+    +sections
+    +sourceUrls
+  }
+  class PlanSection {
+    +name
+    +minutes
+    +questions
+  }
+  class PlanQuestion {
+    +prompt
+    +rubric
+    +sourceUrls
+    +followUpPrompt
+  }
+  class buildInterviewPlan {
+    <<builder>>
+    +build(config, sources) InterviewPlan
+  }
+  class InterviewStrategy {
+    <<interface>>
+    +sectionNames()
+    +followUp(sectionName)
+  }
+  class CodingStrategy
+  class TechnicalStrategy
+  class BehavioralStrategy
+  class SystemDesignStrategy
+  class HrStrategy
+  class MixedStrategy
+  class SearchProvider {
+    <<interface>>
+    +search(query)
+  }
+  class MockSearchProvider
+  class runPublicResearch {
+    <<function>>
+    +collect(config, provider)
+  }
+  class buildFeedback {
+    <<function>>
+    +score(transcript) InterviewFeedback
+  }
+
+  InterviewsController --> SessionStore
+  InterviewsController ..> prepareInterview
+  InterviewsController ..> toInterviewConfiguration
+  toInterviewConfiguration ..> InterviewConfiguration
+  prepareInterview --> InterviewSession
+  prepareInterview ..> runPublicResearch
+  prepareInterview ..> buildInterviewPlan
+  runPublicResearch ..> SearchProvider
+  MockSearchProvider ..|> SearchProvider
+  buildInterviewPlan ..> InterviewStrategy
+  buildInterviewPlan ..> InterviewPlan
+  InterviewSession *-- SessionStateMachine
+  InterviewSession --> InterviewPlan
+  InterviewSession --> InterviewConfiguration
+  InterviewSession ..> buildFeedback
+  SessionStore o-- InterviewSession
+  InterviewPlan *-- PlanSection
+  PlanSection *-- PlanQuestion
+  CodingStrategy ..|> InterviewStrategy
+  TechnicalStrategy ..|> InterviewStrategy
+  BehavioralStrategy ..|> InterviewStrategy
+  SystemDesignStrategy ..|> InterviewStrategy
+  HrStrategy ..|> InterviewStrategy
+  MixedStrategy ..|> InterviewStrategy
+```
+
+`InterviewSession` owns the state machine. `SessionStore` keeps many sessions by id. `prepareInterview` creates the session, collects pages through `SearchProvider`, and builds the plan through the strategy. The six interview classes implement `InterviewStrategy`. `MockSearchProvider` is the only search adapter.
 
 `status`, `plan`, and `transcript` are readable. `cursor`, the state machine, and the configuration are private. Callers do not change status by assigning a string.
 
@@ -37,7 +156,7 @@ Implemented in `session-state.ts`.
 
 `report_ready` and `failed` have no outgoing events. Any other pair throws `Cannot ${event} while the interview is in ${from} state`.
 
-`prepare` performs two transitions in one call: `prepare`, then `plan_ready`. `answer` emits `end` only when the interviewer says the interview is done. `report` emits `report_ready`.
+`ready` performs two transitions in one call: `prepare`, then `plan_ready`. `answer` emits `end` only when the interviewer says the interview is done. `report` emits `report_ready`.
 
 ## Configuration
 
