@@ -1,5 +1,6 @@
 // import { Injectable } from "@nestjs/common";
 import { InterviewSession } from "./interview-session";
+import { NotFoundException } from "@nestjs/common";
 
 // @Injectable()
 export class SessionStore{
@@ -11,7 +12,7 @@ export class SessionStore{
      get(id:string): InterviewSession | undefined{
         const session=this.sessions.get(id);
         if(!session){
-            throw new Error(`Interview ${id} was not found`);
+            throw new NotFoundException(`Interview ${id} was not found`);
         }
         return session;
      }

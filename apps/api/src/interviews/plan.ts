@@ -21,7 +21,7 @@ export function buildInterviewPlan(
             minutes,
             questions:[
                 {
-                    prompt: `Discuss ${name.toLowerCase()}for ${topic}. Use the job requirements and the public preparation sources.`,
+                    prompt: `Discuss ${name.toLowerCase()} for ${topic}. Use the job requirements and the public preparation sources.`,
                     rubric: `Score accuracy, problem-solving, clarity, and relevance at ${config.experienceLevel} level and ${config.difficulty} difficulty.`,
                     sourceUrls:sourceUrls.slice(0,2),
                     followUpPrompt: strategy.followUp(name),

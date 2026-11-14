@@ -1,7 +1,6 @@
 import type { InterviewConfiguration, InterviewPlan, InterviewStatus, InterviewFeedback }  from "@practice-room/shared-types";
-import {firstQuestion, nextTurn, type InterviewCursor, type InterviewTurn} from "./interviewer";
+import {firstQuestion, type InterviewCursor, type InterviewTurn} from "./interviewer";
 import { SessionStateMachine } from "./session-state";
-import { buildFeedback } from "./feedback";
 
 export type TranscriptEntry={
     sectionName: string;
@@ -13,7 +12,7 @@ export class InterviewSession{
     status: InterviewStatus="draft";
     plan: InterviewPlan | null= null;
     transcript: TranscriptEntry[]=[];
-    private cursor: InterviewCursor={sectionIndex: 0, followUpUsed: false};
+    cursor: InterviewCursor={sectionIndex: 0, followUpUsed: false};
     private readonly machine=new SessionStateMachine();
     private readonly config: InterviewConfiguration;
     private constructor(config: InterviewConfiguration){
@@ -39,12 +38,11 @@ export class InterviewSession{
         return turn;
     }
 
-    answer(answer: string): InterviewTurn{
+    applyAnswer(answer: string, result: { cursor: InterviewCursor; turn: InterviewTurn}):InterviewTurn{
         if(this.status!=="live" || !this.plan){
             throw new Error("The interview is not live");
         }
         this.transcript[this.transcript.length-1].answer=answer;
-        const result=nextTurn(this.plan, this.cursor, answer);
         this.cursor=result.cursor;
         if(result.turn.done){
             this.status=this.machine.transition(this.status, "end");
@@ -53,18 +51,13 @@ export class InterviewSession{
         this.transcript.push({
             sectionName: result.turn.sectionName,
             prompt: result.turn.prompt,
-            answer: "", 
+            answer: "",
         });
         return result.turn;
     }
 
-    report(): InterviewFeedback{
-        if(this.status!=="completed"){
-            throw new Error("Finish the interview before generating a report")
-        }
-        const feedback=buildFeedback(this.transcript);
-        this.status=this.machine.transition(this.status, "report_ready");
-        return feedback;
+    markReportReady(): void{
+        this.status=this.machine.transition(this.status, "report_ready"); 
     }
 }
 
