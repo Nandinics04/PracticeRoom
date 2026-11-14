@@ -9,7 +9,7 @@ export class SessionStore{
      save(id: string, session: InterviewSession): void{
         this.sessions.set(id, session);
      }
-     get(id:string): InterviewSession | undefined{
+     get(id:string): InterviewSession {
         const session=this.sessions.get(id);
         if(!session){
             throw new NotFoundException(`Interview ${id} was not found`);
