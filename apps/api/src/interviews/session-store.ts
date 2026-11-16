@@ -16,4 +16,11 @@ export class SessionStore{
         }
         return session;
      }
+     list(): { id: string; status: string; title?: string }[] {
+      return [...this.sessions.entries()].map(([id, session]) => ({
+        id,
+        status: session.status,
+        title: session.plan?.title,
+      }));
+    }
 }

@@ -13,11 +13,27 @@ type InterviewTurn={
     prompt: string;
     done: boolean;
 };
+type FeedbackCriterion={
+    name: string;
+    score: number;
+    evidence: string;
+    explanation: string;
+    confidence: string;
+};
 type InterviewReport={
     status: string;
     overallScore: number;
+    criteria: FeedbackCriterion[];
     strengths: string[];
-}
+    improvements: string[];
+    practiceTopics: string[];
+};
+type InterviewSummary={
+    id: string;
+    status: string;
+    title?: string;
+};
+
 
 export default function App(){
     const [result, setResult]=useState<CreatedInterview|null>(null);
@@ -38,6 +54,7 @@ export default function App(){
     const [code, setCode]=useState("");
 
     const [report, setReport]=useState<InterviewReport|null>(null);
+    const [interviews, setInterviews]=useState<InterviewSummary[]>([]);
 
     const videoRef=useRef<HTMLVideoElement>(null);
     const [cameraReady, setCameraReady]=useState(false);
@@ -64,6 +81,37 @@ export default function App(){
         }
     }, [turn])
 
+    useEffect(()=>{
+        const saveId=sessionStorage.getItem("practice-room-interview");
+        void loadInterviews();
+        if(!saveId){
+            return;
+        }
+        async function restore(){
+            const response=await fetch(`http://localhost:3000/api/v1/interviews/${saveId}`);
+            if(!response.ok){
+                sessionStorage.removeItem("practice-room-interview");
+                return;
+            }
+            const saved=await response.json();
+            setResult({
+                id: saved.id,
+                status: saved.status,
+                title: saved.title,
+                sections: saved.sections,
+            });
+            if(saved.prompt){
+                setTurn({
+                    status: saved.status,
+                    sectionName: saved.sectionName,
+                    prompt: saved.prompt,
+                    done: saved.done,
+                });
+            }
+        }
+        void restore();
+        
+    }, []);
     function listenForAnswer(){
         window.speechSynthesis.cancel();
         const speechWindow=window as Window & {
@@ -143,14 +191,20 @@ export default function App(){
           setError("Screen sharing was cancelled.");
         }
       }
+      async function loadInterviews(){
+        const response=await fetch("http://localhost:3000/api/v1/interviews");
+         if(response.ok){
+            setInterviews(await response.json());
+         }
+      }
     async function createInterview(){
         setError("");
         setTurn(null);
-setReport(null);
-setAnswer("");
-setCode("");
-const body =
-    mode === "job"
+        setReport(null);
+        setAnswer("");
+        setCode("");
+      const body =
+        mode === "job"
         ? {
             mode,
             company,
@@ -178,7 +232,10 @@ const body =
             setError(`Create failed: ${response.status}`);
             return;
         }
-        setResult(await response.json());
+        const created=await response.json();
+        sessionStorage.setItem("practice-room-interview", created.id);
+        setResult(created);
+        void loadInterviews();
     }
     async function startInterview(){
         if(!result){
@@ -245,6 +302,13 @@ const body =
     return(
         <main>
       <h1>PracticeRoom</h1>
+      <ul>
+        {interviews.map((interview)=>(
+            <li key={interview.id}>
+                {interview.title ?? "Untitled"} is {interview.status}
+            </li>
+        ))}
+      </ul>
       <form
         onSubmit={(event) => {
             event.preventDefault();
@@ -295,16 +359,17 @@ const body =
           {result.id} is {result.status}
           {result.title ? `: ${result.title}` : ""}
           <ul>
-            {result.sections.map((section)=>(
+            {result.sections.map((section) => (
                 <li key={section.name}>
-                    {section.name} : {section.minutes} minutes
+                {turn?.sectionName === section.name && !turn.done ? "Now: " : ""}
+                {section.name}: {section.minutes} minutes
                 </li>
             ))}
-          </ul>
+         </ul>
           <br/>
           <button type="button" onClick={startCamera}>Turn camera on</button>
           <video ref={videoRef} autoPlay playsInline muted />
-          <button type="button" onClick={startInterview} disabled={!cameraReady}>Start interview</button>
+          <button type="button" onClick={startInterview} disabled={!cameraReady || result?.status!=="ready"}>Start interview</button>
           {turn ? (
             <>
             <p>
@@ -332,11 +397,20 @@ const body =
                 </form>
                 </>
             )}
-            {report? (
-                <p>
-                    Score {report.overallScore}. {report.strengths.join(", ")}
-                </p>
-            ): null}
+            {report ? (
+                <section>
+                    <p>Score {report.overallScore}.</p>
+                    <ul>
+                    {report.criteria.map((criterion) => (
+                        <li key={criterion.name}>
+                        {criterion.name}: {criterion.score} ({criterion.confidence}). Evidence: {criterion.evidence}
+                        </li>
+                    ))}
+                    </ul>
+                    <p>{report.strengths.join(" ")}</p>
+                    <p>{report.improvements.join(" ")}</p>
+                </section>
+                ) : null}
             </>
           ): null}
         </p>

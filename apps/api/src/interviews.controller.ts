@@ -1,4 +1,4 @@
-import {Body, Controller, Post, Param} from "@nestjs/common";
+import {Body, Controller, Post, Param, Get} from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { JobInterviewInput, SkillInterviewInput } from "@practice-room/shared-types";
 import { prepareInterview } from "./application/interview/prepare-interview";
@@ -17,7 +17,7 @@ export class InterviewsController{
     @Post()
     async create(@Body() body: JobInterviewInput | SkillInterviewInput): Promise<{id: string; status: string; title?: string, sections: {name: string, minutes:number}[];}>{
         const session=await prepareInterview(toInterviewConfiguration(body), new MockSearchProvider());
-        const id="123";
+        const id=randomUUID();
         this.store.save(id,session);
         return{
             id,
@@ -60,5 +60,27 @@ export class InterviewsController{
             ...feedback,
         }
 
+    }
+    @Get()
+    list() {
+      return this.store.list();
+    }
+    @Get(":id")
+    findOne(@Param("id") id: string){
+        const session=this.store.get(id);
+        const last=session.transcript.at(-1);
+        return{
+            id,
+            status: session?.status,
+            title: session.plan?.title,
+            sections:
+             session.plan?.sections.map((section)=>({
+                name: section.name,
+                minutes: section.minutes,
+             })) ?? [],
+             sectionName: last?.sectionName ?? "",
+             prompt: last?.prompt ?? "",
+             done: session.status==="completed" || session.status=="report_ready",
+        };
     }
 }
