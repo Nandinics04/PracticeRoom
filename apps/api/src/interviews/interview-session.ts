@@ -39,9 +39,6 @@ export class InterviewSession{
     }
 
     applyAnswer(answer: string, result: { cursor: InterviewCursor; turn: InterviewTurn}):InterviewTurn{
-        if(this.status!=="live" || !this.plan){
-            throw new Error("The interview is not live");
-        }
         this.transcript[this.transcript.length-1].answer=answer;
         this.cursor=result.cursor;
         if(result.turn.done){
