@@ -1,22 +1,27 @@
 # PracticeRoom interview low-level design
 
-This document matches the code in `apps/api/src/interviews` and `packages/shared-types`. The folder split into `domain`, `application`, and `infrastructure` is the target layout. Those folders are not created yet.
+This document matches the code in `apps/api/src/interviews`, `apps/api/src/application/interview`, and `packages/shared-types`. The React page calls the HTTP routes. It is not part of this class model.
 
 ## Layers as they run today
 
 ```text
-check scripts and, later, Nest controllers
+React page
+        |
+InterviewsController
+        |
+        +-- prepareInterview --> SearchProvider, buildInterviewPlan
+        +-- answerInterview --> AnswerEvaluator --> nextTurn
+        +-- reportInterview --> ReportGenerator --> buildFeedback
         |
 InterviewSession
         |
         +-- SessionStateMachine
-        +-- runPublicResearch --> SearchProvider
-        +-- buildInterviewPlan
-        +-- firstQuestion / nextTurn
-        +-- buildFeedback
+        +-- firstQuestion
+        +-- applyAnswer
+        +-- markReportReady
 ```
 
-`InterviewSession` is the aggregate. Its public methods are `create`, `ready`, `start`, `answer`, and `report`. The constructor is private. Callers use `InterviewSession.create`. `prepareInterview` is the use case that searches, builds the plan, and calls `ready`.
+`InterviewSession` is the aggregate. Its public methods are `create`, `ready`, `start`, `applyAnswer`, and `markReportReady`. The constructor is private. Callers use `InterviewSession.create`. The use cases search, choose the next turn, and score. The session stores the results and changes status.
 
 ## Class diagram
 
@@ -24,6 +29,9 @@ InterviewSession
 classDiagram
   class InterviewsController {
     +create(body)
+    +start(id)
+    +answer(id, body)
+    +report(id)
   }
   class SessionStore {
     -sessions
@@ -42,15 +50,33 @@ classDiagram
     +status
     +plan
     +transcript
-    -cursor
+    +cursor
     -machine
     -config
     +create(config) InterviewSession
     +ready(plan) InterviewPlan
     +start() InterviewTurn
-    +answer(text) InterviewTurn
-    +report() InterviewFeedback
+    +applyAnswer(text, result) InterviewTurn
+    +markReportReady()
   }
+  class answerInterview {
+    <<use case>>
+    +run(session, text, evaluator) InterviewTurn
+  }
+  class AnswerEvaluator {
+    <<interface>>
+    +evaluate(plan, cursor, answer)
+  }
+  class MockAnswerEvaluator
+  class reportInterview {
+    <<use case>>
+    +run(session, generator) InterviewFeedback
+  }
+  class ReportGenerator {
+    <<interface>>
+    +generate(transcript) InterviewFeedback
+  }
+  class MockReportGenerator
   class SessionStateMachine {
     +transition(from, event) InterviewStatus
   }
@@ -104,6 +130,10 @@ classDiagram
     <<function>>
     +collect(config, provider)
   }
+  class nextTurn {
+    <<function>>
+    +choose(plan, cursor, answer)
+  }
   class buildFeedback {
     <<function>>
     +score(transcript) InterviewFeedback
@@ -111,6 +141,8 @@ classDiagram
 
   InterviewsController --> SessionStore
   InterviewsController ..> prepareInterview
+  InterviewsController ..> answerInterview
+  InterviewsController ..> reportInterview
   InterviewsController ..> toInterviewConfiguration
   toInterviewConfiguration ..> InterviewConfiguration
   prepareInterview --> InterviewSession
@@ -120,10 +152,17 @@ classDiagram
   MockSearchProvider ..|> SearchProvider
   buildInterviewPlan ..> InterviewStrategy
   buildInterviewPlan ..> InterviewPlan
+  answerInterview --> InterviewSession
+  answerInterview ..> AnswerEvaluator
+  MockAnswerEvaluator ..|> AnswerEvaluator
+  MockAnswerEvaluator ..> nextTurn
+  reportInterview --> InterviewSession
+  reportInterview ..> ReportGenerator
+  MockReportGenerator ..|> ReportGenerator
+  MockReportGenerator ..> buildFeedback
   InterviewSession *-- SessionStateMachine
   InterviewSession --> InterviewPlan
   InterviewSession --> InterviewConfiguration
-  InterviewSession ..> buildFeedback
   SessionStore o-- InterviewSession
   InterviewPlan *-- PlanSection
   PlanSection *-- PlanQuestion
@@ -135,9 +174,9 @@ classDiagram
   MixedStrategy ..|> InterviewStrategy
 ```
 
-`InterviewSession` owns the state machine. `SessionStore` keeps many sessions by id. `prepareInterview` creates the session, collects pages through `SearchProvider`, and builds the plan through the strategy. The six interview classes implement `InterviewStrategy`. `MockSearchProvider` is the only search adapter.
+`InterviewSession` owns the state machine. `SessionStore` keeps sessions by id in a `Map`. The local controller saves every interview as `123`. `prepareInterview` creates the session, collects pages through `SearchProvider`, and builds the plan through the strategy. `answerInterview` reads the public cursor and asks `AnswerEvaluator`. `reportInterview` asks `ReportGenerator`. The six interview classes implement `InterviewStrategy`. `MockSearchProvider` is the only search adapter.
 
-`status`, `plan`, and `transcript` are readable. `cursor`, the state machine, and the configuration are private. Callers do not change status by assigning a string.
+`status`, `plan`, `transcript`, and `cursor` are readable. The state machine and the configuration are private. Callers do not change status by assigning a string.
 
 ## Status machine
 
@@ -156,7 +195,7 @@ Implemented in `session-state.ts`.
 
 `report_ready` and `failed` have no outgoing events. Any other pair throws `Cannot ${event} while the interview is in ${from} state`.
 
-`ready` performs two transitions in one call: `prepare`, then `plan_ready`. `answer` emits `end` only when the interviewer says the interview is done. `report` emits `report_ready`.
+`ready` performs two transitions in one call: `prepare`, then `plan_ready`. `applyAnswer` emits `end` only when the evaluator says the interview is done. `markReportReady` emits `report_ready`.
 
 ## Configuration
 
@@ -228,11 +267,11 @@ The title is `${role} at ${company}` for a job and the skills joined by `", "` f
 
 `nextTurn` measures `answer.trim().length`.
 
-- Shorter than 40 characters, and this section has not used its follow-up: stay on the section, set `followUpUsed`, ask `Go deeper on ${section}. Add an example.`
+- Shorter than 40 characters, and this section has not used its follow-up: stay on the section, set `followUpUsed`, and return that section's `followUpPrompt`.
 - Otherwise advance `sectionIndex` by 1 and clear `followUpUsed`.
 - If the next index is past the last section, return `done: true` and the prompt `That completes the interview.` That closing turn is not pushed onto the transcript.
 
-`answer` writes the text onto the last transcript row before asking for the next turn. It throws `The interview is not live` unless status is `live`. `start` throws `Prepare the interview before starting` when `plan` is null.
+`MockAnswerEvaluator` calls `nextTurn`. `answerInterview` throws `Interview is not live` unless status is `live` and a plan exists. `applyAnswer` writes the text onto the last transcript row, stores the cursor, and pushes the next prompt when the interview is not done. `start` throws `Prepare the interview before starting` when `plan` is null.
 
 ## Feedback
 
@@ -250,7 +289,7 @@ Criteria, in order:
 
 `strengths` lists `Developed answer in ${section}.` for each developed row. `improvements` lists `Expand the answer in ${section}.` for each short row. `practiceTopics` lists those short-answer section names.
 
-`report` calls `buildFeedback` only when status is `completed`, then moves to `report_ready`. Any other status throws `Finish the interview before generating a report`.
+`reportInterview` calls `ReportGenerator.generate` only when status is `completed`, then calls `markReportReady`. `MockReportGenerator` calls `buildFeedback`. Any other status throws `Finish the interview before generating a report`.
 
 ## Object model
 
@@ -259,7 +298,7 @@ InterviewSession
   status: InterviewStatus
   plan: InterviewPlan | null
   transcript: TranscriptEntry[]
-  cursor: InterviewCursor          private
+  cursor: InterviewCursor
   machine: SessionStateMachine     private
   config: InterviewConfiguration   private
 
@@ -281,13 +320,15 @@ Shared types live in `packages/shared-types/src/interview.ts` and are re-exporte
 ## Patterns
 
 - **State.** `SessionStateMachine.transition` is the only status writer.
-- **Port and adapter.** `SearchProvider` is the port. `MockSearchProvider` is the adapter.
+- **Port and adapter.** `SearchProvider`, `AnswerEvaluator`, and `ReportGenerator` are the ports. `MockSearchProvider`, `MockAnswerEvaluator`, and `MockReportGenerator` are the adapters.
 - **Builder.** `buildInterviewPlan` assembles sections from the interview type and the duration.
+- **Strategy.** `InterviewStrategy` supplies section names and the follow-up sentence.
 - **Factory.** `InterviewSession.create` hides the constructor.
+- **Use case.** `prepareInterview`, `answerInterview`, and `reportInterview` coordinate the ports. The session applies the result.
 
 ## Target change
 
-`PrepareInterview` should take the configuration and a `SearchProvider`, run research, build the plan, and pass that plan into the session. The session method that accepts the plan should only move `draft` to `ready`. Until that move, `InterviewSession.prepare` remains the coordinator, which is why the session file imports `runPublicResearch` and `buildInterviewPlan`.
+A later model service can replace the three mocks without changing `InterviewSession`. The session already receives a finished plan, a finished turn, and a status change for the report. It does not import the search client, `nextTurn`, or `buildFeedback`.
 
 ## Checks
 
@@ -300,10 +341,18 @@ Shared types live in `packages/shared-types/src/interview.ts` and are re-exporte
 | `plan.check.ts` | Titles, minute totals, source URLs |
 | `interviewer.check.ts` | Follow-up once, then advance, then done |
 | `feedback.check.ts` | Scores 40 and 80, quoted evidence, blank answer throws |
-| `interview-session.check.ts` | Full path through `report_ready` |
+| `interview-session.check.ts` | Full path through `report_ready` for both modes |
+| `interview-strategy.check.ts` | Section names and follow-up text |
+| `session-store.check.ts` | Save, load, and a missing id |
 
-Run a check with:
+Run a source check that only imports files ending in `.ts` with:
 
 ```powershell
 node --experimental-strip-types apps/api/src/interviews/<file>.check.ts
+```
+
+Run the session check with `tsx`, because the session file uses the extensionless imports Nest requires:
+
+```powershell
+pnpm dlx tsx apps/api/src/interviews/interview-session.check.ts
 ```

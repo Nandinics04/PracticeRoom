@@ -1,17 +1,29 @@
 # PracticeRoom high-level design
 
-PracticeRoom is a pnpm workspace. The running code is a NestJS API plus a shared TypeScript package. The interview rules run in the API process. They are not a separate Python service yet.
+PracticeRoom is a pnpm workspace. The running code is a React page and a NestJS API, plus a shared TypeScript package. The interview rules run in the API process. They are not a separate Python service yet.
 
 ```text
-packages/shared-types     InterviewConfiguration, plan, research, and feedback types
+apps/web                  React page on port 5173
+        |  HTTP, CORS origin http://localhost:5173
+        v
+apps/api                  NestJS process on port 3000
+  GET  /api/v1/health
+  POST /api/v1/interviews
+  POST /api/v1/interviews/:id/start
+  POST /api/v1/interviews/:id/answer
+  POST /api/v1/interviews/:id/report
         |
-apps/api                  NestJS process
-  interfaces              GET /api/v1/health
-  interview engine        session, research, plan, turns, feedback
-  SearchProvider          MockSearchProvider returns example pages
+        v
+application use cases     prepareInterview, answerInterview, reportInterview
+        |
+        v
+InterviewSession          status, plan, cursor, transcript
+SearchProvider            MockSearchProvider returns example pages
+AnswerEvaluator           MockAnswerEvaluator calls nextTurn
+ReportGenerator           MockReportGenerator calls buildFeedback
 ```
 
-`apps/web` and `apps/ai-service` are reserved folders. They have no application code. PostgreSQL, Redis, S3, and Kubernetes are not wired up.
+`apps/ai-service` is a reserved folder. PostgreSQL, Redis, S3, and Kubernetes are not wired up. The browser speaks and listens. Audio and camera video stay on the page.
 
 ## What happens in one session
 
@@ -22,54 +34,55 @@ JobInterviewInput or SkillInterviewInput
 toInterviewConfiguration
         |
         v
-InterviewSession.create          status: draft
+prepareInterview(SearchProvider)
+  InterviewSession.create          status: draft
+  runPublicResearch                job mode: example pages
+                                   skill mode: no queries
+  buildInterviewPlan
+  session.ready(plan)              status: preparing, then ready
         |
         v
-session.prepare(SearchProvider)  status: preparing, then ready
-        |                        job mode: queries and example pages
-        |                        skill mode: no queries
-        v
-buildInterviewPlan               sections sum to durationMinutes
+session.start                      status: live, first transcript row
         |
         v
-session.start                    status: live, first transcript row
+answerInterview(AnswerEvaluator)
+  nextTurn decides the follow-up
+  session.applyAnswer              stays live, or status: completed
         |
         v
-session.answer                   follow-up or next section
-        |
-        v
-last answer                      status: completed
-        |
-        v
-session.report                   status: report_ready
-                                 InterviewFeedback
+reportInterview(ReportGenerator)
+  buildFeedback scores the transcript
+  session.markReportReady          status: report_ready
 ```
 
-The session is the only object that changes interview status. It does that through `SessionStateMachine`. A check script or a future controller calls `create`, `prepare`, `start`, `answer`, and `report`. It does not assign `status` itself.
+The session is the only object that changes interview status. It does that through `SessionStateMachine`. The controller and the use cases do not assign `status` themselves.
 
 ## Components that exist
 
 | Component | Where | Role |
 |---|---|---|
+| Web page | `apps/web/src/App.tsx` | Form, plan list, camera preview, spoken question, answer, code editor, report |
 | Shared types | `packages/shared-types` | Types imported by the API. No runtime behavior. |
-| HTTP interface | `apps/api/src/main.ts`, `health.controller.ts` | Prefix `api/v1`. Health returns `ok` and the experience levels. |
-| Configuration | `interviews/configuration.ts` | Maps both forms onto `InterviewConfiguration`. |
-| Research | `interviews/research.ts`, `research-service.ts` | Builds site queries and collects pages. |
-| Search port | `interviews/search-provider.ts` | `SearchProvider` and `MockSearchProvider`. |
-| Plan | `interviews/plan.ts` | Sections, minutes, one question each. |
-| Interviewer | `interviews/interviewer.ts` | First question, follow-up, and next section. |
-| Session | `interviews/interview-session.ts` | Aggregate: status, plan, cursor, transcript. |
-| Feedback | `interviews/feedback.ts` | Scores the transcript and quotes an answer. |
-| State machine | `interviews/session-state.ts` | Legal status transitions. |
+| HTTP interface | `apps/api/src/main.ts`, controllers | Prefix `api/v1`. CORS for port 5173. |
+| Prepare | `application/interview/prepare-interview.ts` | Search, plan, then `ready` |
+| Answer | `application/interview/answer-interview.ts` | Evaluator, then `applyAnswer` |
+| Report | `application/interview/report-interview.ts` | Generator, then `markReportReady` |
+| Configuration | `interviews/configuration.ts` | Maps both forms onto `InterviewConfiguration` |
+| Research | `interviews/research.ts`, `research-service.ts` | Builds site queries and collects pages |
+| Search port | `interviews/search-provider.ts` | `SearchProvider` and `MockSearchProvider` |
+| Plan | `interviews/plan.ts`, `interview-strategy.ts` | Sections, minutes, follow-up text |
+| Interviewer | `interviews/interviewer.ts` | First question and the 40-character follow-up rule |
+| Session | `interviews/interview-session.ts` | Aggregate: status, plan, cursor, transcript |
+| Feedback | `interviews/feedback.ts` | Scores the transcript and quotes an answer |
+| Store | `interviews/session-store.ts` | In-memory map. Unknown id is a 404 |
+| State machine | `interviews/session-state.ts` | Legal status transitions |
 
-## Target shape, not moved yet
+## Target shape
 
-The low-level design separates domain rules, application use cases, and infrastructure. The files above still share `apps/api/src/interviews/`. `InterviewSession.prepare` still calls research and plan building directly. The next structural change extracts that coordination into a `PrepareInterview` use case so the session receives a finished plan and does not import the search client.
+A later FastAPI service can own model calls and web search behind `SearchProvider`, `AnswerEvaluator`, and `ReportGenerator`. The Nest API keeps the session lifecycle. The mocks stay until that service exists.
 
-A later FastAPI service can own model calls and web search behind the same `SearchProvider` port. The Nest API keeps identity, session lifecycle, and reports.
+Screen capture is a function in the web module and is not on the page. It waits until a recording can be stored. The camera preview is not a recording.
 
 ## Runtime
 
-Local checks execute TypeScript with `node --experimental-strip-types`. Nest compiles the API separately with `nest start` and serves port 3000. The engine does not need the server to be running. The health route does.
-
-Node prints a module-type warning for the check scripts. The API package stays CommonJS because that is what Nest emits. `"type": "module"` is not set.
+`pnpm --filter @practice-room/api start` serves port 3000. `pnpm --filter @practice-room/web dev` serves port 5173. The session check runs with `pnpm dlx tsx` because the API sources use extensionless imports. The API package stays CommonJS because that is what Nest emits. `"type": "module"` is not set on `apps/api`.

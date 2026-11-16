@@ -5,7 +5,8 @@ type CreatedInterview={
     id: string;
     status: string;
     title?: string;
-}
+    sections: {name: string; minutes: number}[];
+};
 type InterviewTurn={
     status: string;
     sectionName: string;
@@ -21,6 +22,15 @@ type InterviewReport={
 export default function App(){
     const [result, setResult]=useState<CreatedInterview|null>(null);
     const [error, setError]=useState("");
+    const [mode, setMode]=useState<"job" | "skill">("job");
+    const [company, setCompany]=useState("Google");
+    const [role, setRole]=useState("Software Engineer");
+    const [description, setDescription]=useState("Build reliable backend services.");
+    const [skills, setSkills]=useState("JavaScript");
+    const [interviewType, setInterviewType]=useState("technical");
+    const [experienceLevel, setExperienceLevel]=useState("mid");
+    const [difficulty, setDifficulty]=useState("medium");
+    const [durationMinutes, setDurationMinutes]=useState(30);
 
     const [turn, setTurn]=useState<InterviewTurn|null>(null);
 
@@ -135,19 +145,34 @@ export default function App(){
       }
     async function createInterview(){
         setError("");
+        setTurn(null);
+setReport(null);
+setAnswer("");
+setCode("");
+const body =
+    mode === "job"
+        ? {
+            mode,
+            company,
+            role,
+            description,
+            interviewType,
+            experienceLevel,
+            difficulty,
+            durationMinutes: Number(durationMinutes),
+        }
+        : {
+            mode,
+            skills: skills.split(",").map((skill) => skill.trim()).filter(Boolean),
+            interviewType,
+            experienceLevel,
+            difficulty,
+            durationMinutes: Number(durationMinutes),
+        };
         const response=await fetch("http://localhost:3000/api/v1/interviews", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                mode: "job",
-                company: "Google",
-                role: "Software Engineer",
-                description: "Build reliable backend services.",
-                interviewType: "technical",
-                experienceLevel: "mid",
-                difficulty: "medium",
-                durationMinutes: 30,
-            }),
+            body: JSON.stringify(body),
         });
         if(!response.ok){
             setError(`Create failed: ${response.status}`);
@@ -220,14 +245,62 @@ export default function App(){
     return(
         <main>
       <h1>PracticeRoom</h1>
-      <button type="button" onClick={createInterview}>
-        Create interview
-      </button>
+      <form
+        onSubmit={(event) => {
+            event.preventDefault();
+            createInterview();
+        }}
+        >
+        <select value={mode} onChange={(event) => setMode(event.target.value as "job" | "skill")}>
+            <option value="job">Job</option>
+            <option value="skill">Skill</option>
+        </select>
+        {mode === "job" ? (
+            <>
+            <input value={company} onChange={(event) => setCompany(event.target.value)} />
+            <input value={role} onChange={(event) => setRole(event.target.value)} />
+            <input value={description} onChange={(event) => setDescription(event.target.value)} />
+            </>
+        ) : (
+            <input value={skills} onChange={(event) => setSkills(event.target.value)} />
+        )}
+        <select value={interviewType} onChange={(event) => setInterviewType(event.target.value)}>
+            <option value="technical">technical</option>
+            <option value="coding">coding</option>
+            <option value="behavioral">behavioral</option>
+            <option value="system_design">system_design</option>
+            <option value="hr">hr</option>
+            <option value="mixed">mixed</option>
+        </select>
+        <select value={experienceLevel} onChange={(event) => setExperienceLevel(event.target.value)}>
+            <option value="entry">entry</option>
+            <option value="mid">mid</option>
+            <option value="senior">senior</option>
+        </select>
+        <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}>
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+        </select>
+        <input
+            type="number"
+            value={durationMinutes}
+            onChange={(event) => setDurationMinutes(Number(event.target.value))}
+        />
+        <button type="submit">Create interview</button>
+        </form>
       {error ? <p>{error}</p> : null}
       {result ? (
         <p>
           {result.id} is {result.status}
           {result.title ? `: ${result.title}` : ""}
+          <ul>
+            {result.sections.map((section)=>(
+                <li key={section.name}>
+                    {section.name} : {section.minutes} minutes
+                </li>
+            ))}
+          </ul>
           <br/>
           <button type="button" onClick={startCamera}>Turn camera on</button>
           <video ref={videoRef} autoPlay playsInline muted />

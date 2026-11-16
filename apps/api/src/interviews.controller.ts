@@ -15,7 +15,7 @@ export class InterviewsController{
     constructor(private readonly store: SessionStore){}
 
     @Post()
-    async create(@Body() body: JobInterviewInput | SkillInterviewInput): Promise<{id: string; status: string; title?: string}>{
+    async create(@Body() body: JobInterviewInput | SkillInterviewInput): Promise<{id: string; status: string; title?: string, sections: {name: string, minutes:number}[];}>{
         const session=await prepareInterview(toInterviewConfiguration(body), new MockSearchProvider());
         const id="123";
         this.store.save(id,session);
@@ -23,6 +23,10 @@ export class InterviewsController{
             id,
             status: session.status,
             title: session.plan?.title,
+            sections: session.plan?.sections.map((section)=>({
+                name: section.name,
+                minutes: section.minutes,
+            })) ?? [],
         };
     }
     @Post(":id/start")

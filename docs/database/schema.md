@@ -8,17 +8,19 @@ No database is connected. A session lives on the `InterviewSession` object and d
 
 | Field | Type | Who writes it |
 |---|---|---|
-| `status` | `InterviewStatus` | `SessionStateMachine` through `prepare`, `start`, `answer`, and `report` |
-| `plan` | `InterviewPlan` or `null` | `prepare` |
-| `transcript` | `TranscriptEntry[]` | `start` and `answer` |
-| `cursor` | `InterviewCursor` | `answer`, private |
+| `status` | `InterviewStatus` | `SessionStateMachine` through `ready`, `start`, `applyAnswer`, and `markReportReady` |
+| `plan` | `InterviewPlan` or `null` | `ready` |
+| `transcript` | `TranscriptEntry[]` | `start` and `applyAnswer` |
+| `cursor` | `InterviewCursor` | `applyAnswer` |
 | `config` | `InterviewConfiguration` | `create`, private |
 
 `TranscriptEntry` is `sectionName`, `prompt`, and `answer`. A new question is pushed with `answer: ""`. The candidate's text replaces that empty string. The final "That completes the interview." turn is not a transcript row.
 
 `InterviewPlan` stores `title`, `totalMinutes`, `sections`, and `sourceUrls`. Each section stores `name`, `minutes`, and one `PlanQuestion` with `prompt`, `rubric`, and up to two source URLs.
 
-`InterviewFeedback` is computed by `report` and returned to the caller. The session does not keep the report on a field. After `report`, only `status` shows that the report was produced (`report_ready`).
+`InterviewFeedback` is computed by `reportInterview` and returned to the caller. The session does not keep the report on a field. After `markReportReady`, only `status` shows that the report was produced (`report_ready`).
+
+`SessionStore` holds those session objects in a `Map` for the life of the API process. The current create route stores one session under the id `123`.
 
 Research pages are not stored separately. Their URLs are copied onto the plan. `MockSearchProvider` does not download page bodies.
 

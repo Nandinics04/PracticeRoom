@@ -10,8 +10,8 @@ Accepted for the current engine.
 
 ## Why
 
-The rules for preparation, follow-ups, completion, and feedback can be proven with check scripts before a database, accounts, or HTTP ids exist. The state machine is already the writer of `status`, so a later repository only has to save the result of those methods.
+The rules for preparation, follow-ups, completion, and feedback can be proven with check scripts before a database or accounts exist. The state machine is already the writer of `status`, so a later repository only has to save the result of those methods.
 
 ## Consequence
 
-A session is lost when the process exits. HTTP routes that look up an interview by id wait until a store exists. The planned tables are listed in `docs/database/schema.md` and are not created.
+`SessionStore` keeps the sessions in a `Map`. A session is lost when the process exits. The HTTP routes load by id from that map. The planned tables are listed in `docs/database/schema.md` and are not created.

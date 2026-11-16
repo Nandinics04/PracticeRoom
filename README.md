@@ -2,9 +2,9 @@
 
 PracticeRoom is a mock-interview platform. A candidate describes a job or a set of skills. The system prepares an interview, asks one question at a time, and keeps a transcript.
 
-The product name in the interface is PracticeRoom. The npm packages are lowercase: `practice-room`, `@practice-room/api`, and `@practice-room/shared-types`.
+The product name in the interface is PracticeRoom. The npm packages are lowercase: `practice-room`, `@practice-room/web`, `@practice-room/api`, and `@practice-room/shared-types`.
 
-This README covers the work completed so far. The interview engine runs in memory and is verified by check scripts. Accounts, a database, the website, voice, camera, and a live web search are not built yet.
+The interview engine runs in the NestJS API. Sessions live in memory. The React page creates a job or skill interview, shows the plan, requires a camera preview, speaks each question, accepts a spoken or typed answer plus code, and loads the report. Search still returns example links. Accounts, a database, and uploaded recordings are not built.
 
 ## What a session does today
 
@@ -13,7 +13,7 @@ This README covers the work completed so far. The interview engine runs in memor
 3. Collect those pages through a `SearchProvider`. The current provider returns example links. It does not open the internet.
 4. Build a timed interview plan whose sections add up to the requested duration.
 5. Ask the first question, ask one follow-up when an answer is shorter than 40 characters, then move to the next section.
-6. Store each prompt and answer. When the last section is answered, the session status becomes `completed`.
+6. Store each prompt and answer. When the last section is answered, the session status becomes `completed`, then the report moves it to `report_ready`.
 
 A technical interview has three sections: Background, Core concepts, and Follow-ups. A short answer stays in the current section. Each later answer moves one section forward. The interview is finished only after the candidate answers the last section.
 
@@ -36,7 +36,7 @@ stateDiagram-v2
   failed --> [*]
 ```
 
-`prepare` runs research and builds the plan. `plan_ready` means the plan exists. `start` asks the first question. `end` is the answer to the last section. `report_ready` is the feedback report. `failed` is allowed from preparation, from the ready plan, or from the live interview. `report_ready` and `failed` have no further moves.
+`prepareInterview` runs research and builds the plan, then `ready` applies `prepare` and `plan_ready`. `start` asks the first question. `end` is the answer to the last section. `report_ready` is the feedback report. `failed` is allowed from preparation, from the ready plan, or from the live interview. `report_ready` and `failed` have no further moves.
 
 ## Repository layout
 
@@ -44,7 +44,7 @@ stateDiagram-v2
 PracticeRoom/
 ├── apps/api/                         NestJS API and the interview engine
 │   └── src/interviews/               Configuration, research, plan, turns, session
-├── apps/web/                         React app, not started
+├── apps/web/                         React interview page
 ├── apps/ai-service/                  FastAPI agents, not started
 ├── packages/shared-types/            Types shared by the web app and the API
 ├── docs/                             PRD, HLD, LLD, API, data, and decisions
@@ -61,7 +61,7 @@ PracticeRoom/
 | [docs/requirements/prd.md](docs/requirements/prd.md) | Candidate flows, interview rules, and feedback rules that are implemented |
 | [docs/architecture/hld.md](docs/architecture/hld.md) | Workspace, session flow, and which services are not running yet |
 | [docs/lld/interview.md](docs/lld/interview.md) | Status machine, research queries, plan timing, turns, and scoring |
-| [docs/api/http.md](docs/api/http.md) | `GET /api/v1/health`, and the interview routes that are not registered |
+| [docs/api/http.md](docs/api/http.md) | Health, create, start, answer, and report |
 | [docs/database/schema.md](docs/database/schema.md) | The in-memory session, and the tables planned for later |
 | [docs/decisions](docs/decisions) | Why the session is in memory, why search is a provider, and why scores quote answers |
 
@@ -88,7 +88,17 @@ In a second terminal:
 Invoke-RestMethod http://localhost:3000/api/v1/health
 ```
 
-The response is `status: ok` and the experience levels `entry`, `mid`, and `senior`. Stop the server with Ctrl+C.
+The response is `status: ok` and the experience levels `entry`, `mid`, and `senior`. The API also allows the page at `http://localhost:5173` to call it. Stop the server with Ctrl+C.
+
+## Run the web page
+
+In a second terminal, from the repository root:
+
+```powershell
+pnpm --filter @practice-room/web dev
+```
+
+Open `http://localhost:5173`. Create a job or skill interview, turn the camera on, start, answer the questions, and load the report. The create route currently saves every interview under the id `123`, so a new create replaces the previous session in that process.
 
 ## Check the interview engine
 
@@ -102,7 +112,7 @@ node --experimental-strip-types apps/api/src/interviews/research.check.ts
 node --experimental-strip-types apps/api/src/interviews/research-service.check.ts
 node --experimental-strip-types apps/api/src/interviews/plan.check.ts
 node --experimental-strip-types apps/api/src/interviews/interviewer.check.ts
-node --experimental-strip-types apps/api/src/interviews/interview-session.check.ts
+pnpm dlx tsx apps/api/src/interviews/interview-session.check.ts
 ```
 
 Expected success lines:
@@ -117,7 +127,7 @@ interviewer turns ok
 interview session ok
 ```
 
-Node prints a `MODULE_TYPELESS_PACKAGE_JSON` warning before those lines. Leave it. Do not add `"type": "module"` to `apps/api/package.json`. Nest compiles the API as CommonJS, and that field would break `nest start`.
+The session check is run with `tsx` because `interview-session.ts` uses extensionless imports for Nest, and the check uses `await` inside `main`. The earlier checks still use `node --experimental-strip-types`. Node may print a `MODULE_TYPELESS_PACKAGE_JSON` warning. Leave it. Do not add `"type": "module"` to `apps/api/package.json`. Nest compiles the API as CommonJS, and that field would break `nest start`.
 
 When a check script imports a local file, the import must end in `.ts`, for example `./session-state.ts`. Node is executing the TypeScript source directly. It will not find a `.js` file that was never built.
 
@@ -225,16 +235,30 @@ Check: `node --experimental-strip-types apps/api/src/interviews/interviewer.chec
 | Method | Status change | What it does |
 |---|---|---|
 | `create` | `draft` | Holds the configuration |
-| `prepare` | `draft` to `preparing` to `ready` | Runs research and builds the plan |
+| `ready` | `draft` to `preparing` to `ready` | Stores a plan that `prepareInterview` already built |
 | `start` | `ready` to `live` | Asks the first question |
-| `answer` | stays `live`, or moves to `completed` | Records the answer and asks the next turn |
+| `applyAnswer` | stays `live`, or moves to `completed` | Stores an answer and a turn chosen by `answerInterview` |
+| `markReportReady` | `completed` to `report_ready` | Records that `reportInterview` produced feedback |
 
-`start` throws before `prepare`. `answer` throws unless the status is `live`, including after the interview is completed.
+`prepareInterview` searches and builds the plan. `answerInterview` asks `MockAnswerEvaluator`, which calls `nextTurn`. `reportInterview` asks `MockReportGenerator`, which calls `buildFeedback`. The session changes status and the transcript. It does not search, choose the next question, or score.
 
-Check: `node --experimental-strip-types apps/api/src/interviews/interview-session.check.ts`
+`start` throws when the session has no plan. `applyAnswer` throws unless the status is `live`.
+
+Check: `pnpm dlx tsx apps/api/src/interviews/interview-session.check.ts`
 
 The job session in that check searches with `MockSearchProvider`, so the plan has source URLs. The skill session has none. The candidate gives one short answer and then three long answers, which is what a three-section technical interview needs.
 
+## Page behavior
+
+`apps/web` talks to the API on port 3000.
+
+- The form creates a job interview or a skill interview and shows each section name and its minutes.
+- **Start interview** stays disabled until the camera preview is on. The preview is local. It is not uploaded and it is not scored.
+- The browser speaks the current question with `speechSynthesis`. **Speak your answer** uses `SpeechRecognition` or `webkitSpeechRecognition` and puts the words in the answer box. **Submit** sends the text the candidate confirmed.
+- The code editor is sent with that answer, then cleared for the next question.
+- When the last answer finishes the interview, the page stops the camera and speech.
+- **Load report** calls the report route. Screen sharing is implemented in the page module and is not shown. It waits until a recording can be stored.
+
 ## Not built yet
 
-The next product work is a feedback report from the transcript, then accounts and a database so a session survives a restart. After that comes the React interview screen, microphone and camera permissions, and a real `SearchProvider` that runs the saved queries on the public web.
+Accounts, a database, a real `SearchProvider`, saved recordings, and the screen-share control on the page. A session disappears when the API process stops.
