@@ -7,11 +7,20 @@ export type TranscriptEntry={
     prompt: string;
     answer: string;
 };
+export type SessionRecord = {
+    status: InterviewStatus;
+    plan: InterviewPlan | null;
+    transcript: TranscriptEntry[];
+    feedback: InterviewFeedback | null;
+    cursor: InterviewCursor;
+    config: InterviewConfiguration;
+  };
 
 export class InterviewSession{
     status: InterviewStatus="draft";
     plan: InterviewPlan | null= null;
     transcript: TranscriptEntry[]=[];
+    feedback: InterviewFeedback | null = null;
     cursor: InterviewCursor={sectionIndex: 0, followUpUsed: false};
     private readonly machine=new SessionStateMachine();
     private readonly config: InterviewConfiguration;
@@ -53,9 +62,34 @@ export class InterviewSession{
         return result.turn;
     }
 
-    markReportReady(): void{
+    markReportReady(feedback: InterviewFeedback): void{
+        this.feedback=feedback;
         this.status=this.machine.transition(this.status, "report_ready"); 
     }
+    get interviewType() {
+        return this.config.interviewType;
+    }
+    toRecord(): SessionRecord {
+        return {
+          status: this.status,
+          plan: this.plan,
+          transcript: this.transcript,
+          feedback: this.feedback,
+          cursor: this.cursor,
+          config: this.config,
+        };
+      }
+      
+      static fromRecord(record: SessionRecord): InterviewSession {
+        const session = InterviewSession.create(record.config);
+        session.status = record.status;
+        session.plan = record.plan;
+        session.transcript = record.transcript.map((entry) => ({ ...entry }));
+        session.feedback = record.feedback;
+        session.cursor = { ...record.cursor };
+        return session;
+      }
+      
 }
 
 

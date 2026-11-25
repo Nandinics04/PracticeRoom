@@ -15,7 +15,7 @@ export class InterviewsController{
     constructor(private readonly store: SessionStore){}
 
     @Post()
-    async create(@Body() body: JobInterviewInput | SkillInterviewInput): Promise<{id: string; status: string; title?: string, sections: {name: string, minutes:number}[];}>{
+    async create(@Body() body: JobInterviewInput | SkillInterviewInput): Promise<{id: string; status: string; title?: string,interviewType: string; sections: {name: string, minutes:number}[]; sourceUrls: string[]}>{
         const session=await prepareInterview(toInterviewConfiguration(body), new MockSearchProvider());
         const id=randomUUID();
         this.store.save(id,session);
@@ -23,16 +23,19 @@ export class InterviewsController{
             id,
             status: session.status,
             title: session.plan?.title,
+            interviewType: session.interviewType,
             sections: session.plan?.sections.map((section)=>({
                 name: section.name,
                 minutes: section.minutes,
             })) ?? [],
+            sourceUrls: session.plan?.sourceUrls ?? [],
         };
     }
     @Post(":id/start")
     async start(@Param("id") id: string){
         const session=this.store.get(id);
         const turn = session?.start();
+        this.store.save(id, session);
         return{
             status: session?.status,
             sectionName: turn?.sectionName,
@@ -73,13 +76,16 @@ export class InterviewsController{
             id,
             status: session?.status,
             title: session.plan?.title,
+            interviewType: session.interviewType,
             sections:
              session.plan?.sections.map((section)=>({
                 name: section.name,
                 minutes: section.minutes,
              })) ?? [],
+             sourceUrls: session.plan?.sourceUrls ?? [],
              sectionName: last?.sectionName ?? "",
              prompt: last?.prompt ?? "",
+             feedback: session.feedback,
              done: session.status==="completed" || session.status=="report_ready",
         };
     }

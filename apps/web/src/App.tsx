@@ -5,7 +5,9 @@ type CreatedInterview={
     id: string;
     status: string;
     title?: string;
+    interviewType: string,
     sections: {name: string; minutes: number}[];
+    sourceUrls: string[];
 };
 type InterviewTurn={
     status: string;
@@ -32,6 +34,7 @@ type InterviewSummary={
     id: string;
     status: string;
     title?: string;
+    interviewType: string;
 };
 
 
@@ -71,7 +74,8 @@ export default function App(){
        }
     },[])
     useEffect(()=>{
-        if(!turn?.prompt){
+        if(!turn?.prompt || turn.done){
+            window.speechSynthesis.cancel();
             return;
         }
         window.speechSynthesis.cancel();
@@ -98,8 +102,11 @@ export default function App(){
                 id: saved.id,
                 status: saved.status,
                 title: saved.title,
+                interviewType: saved.interviewType,
                 sections: saved.sections,
+                sourceUrls: saved.sourceUrls,
             });
+            setReport(saved.feedback ?? null);
             if(saved.prompt){
                 setTurn({
                     status: saved.status,
@@ -197,6 +204,37 @@ export default function App(){
             setInterviews(await response.json());
          }
       }
+      async function openInterview(id: string) {
+        setError("");
+        const response = await fetch(`http://localhost:3000/api/v1/interviews/${id}`);
+        if (!response.ok) {
+          setError("That interview is no longer available.");
+          return;
+        }
+        const saved = await response.json();
+        sessionStorage.setItem("practice-room-interview", saved.id);
+        setReport(saved.feedback ?? null);
+        setAnswer("");
+        setCode("");
+        setResult({
+          id: saved.id,
+          status: saved.status,
+          title: saved.title,
+          interviewType: saved.interviewType,
+          sections: saved.sections,
+          sourceUrls: saved.sourceUrls,
+        });
+        if (saved.prompt) {
+          setTurn({
+            status: saved.status,
+            sectionName: saved.sectionName,
+            prompt: saved.prompt,
+            done: saved.done,
+          });
+        } else {
+          setTurn(null);
+        }
+      }
     async function createInterview(){
         setError("");
         setTurn(null);
@@ -253,6 +291,7 @@ export default function App(){
         const next=await response.json();
         setTurn(next);
         setResult({...result, status: next.status});
+        void loadInterviews();
     }
     async function submitAnswer(){
         if(!result || !turn || turn.done){
@@ -275,6 +314,7 @@ export default function App(){
         const next=await response.json();
         setTurn(next);
         setResult({...result, status: next.status});
+        void loadInterviews();
         setAnswer("");
         setCode("");
         if(next.done){
@@ -297,6 +337,7 @@ export default function App(){
         }
         const next=await response.json();
         setReport(next);
+        void loadInterviews();
         setResult({...result, status: next.status});
     }
     return(
@@ -305,8 +346,11 @@ export default function App(){
       <ul>
         {interviews.map((interview)=>(
             <li key={interview.id}>
-                {interview.title ?? "Untitled"} is {interview.status}
-            </li>
+            <button type="button" onClick={() => openInterview(interview.id)}>
+            {interview.id === result?.id ? "Open: " : ""}
+            {interview.title ?? "Untitled"} {interview.interviewType} is {interview.status}
+            </button>
+          </li>
         ))}
       </ul>
       <form
@@ -357,28 +401,41 @@ export default function App(){
       {result ? (
         <p>
           {result.id} is {result.status}
-          {result.title ? `: ${result.title}` : ""}
+          {result.title ? `: ${result.title}` : ""} ({result.interviewType})
           <ul>
-            {result.sections.map((section) => (
-                <li key={section.name}>
-                {turn?.sectionName === section.name && !turn.done ? "Now: " : ""}
-                {section.name}: {section.minutes} minutes
-                </li>
-            ))}
-         </ul>
-          <br/>
+        {result.sections.map((section) => (
+            <li key={section.name}>
+            {turn?.sectionName === section.name && !turn.done ? "Now: " : ""}
+            {section.name}: {section.minutes} minutes
+            </li>
+        ))}
+
+        </ul>
+        
+        <ul>
+        {result.sourceUrls.map((url) => (
+            <li key={url}>
+            <a href={url} target="_blank" rel="noreferrer">{url}</a>
+          </li>
+        ))}
+        </ul>
+
+            <br/>
           <button type="button" onClick={startCamera}>Turn camera on</button>
           <video ref={videoRef} autoPlay playsInline muted />
           <button type="button" onClick={startInterview} disabled={!cameraReady || result?.status!=="ready"}>Start interview</button>
           {turn ? (
             <>
             <p>
-                {turn.sectionName} : {turn.prompt}
+              {turn.done
+                ? "That completes the interview."
+                : `${turn.sectionName}: ${turn.prompt}`}
             </p>
-            {turn.done ? (
+            {turn.done && result.status === "completed" ? (
                 <button type="button" onClick={loadReport}>Load report</button>
-            ) : (
-                <>
+            ) : turn.done ? null : (
+            <>
+            {result.interviewType === "coding" ? (
                 <Editor
                     height="240px"
                     defaultLanguage="typescript"
@@ -386,16 +443,23 @@ export default function App(){
                     value={code}
                     onChange={(value) => setCode(value ?? "")}
                 />
-                
-                <form onSubmit={(event)=>{event.preventDefault(); submitAnswer();}}>
-                     <button type="button" onClick={listenForAnswer}>
-                        Speak your answer
-                    </button>
-                    <textarea value={answer} onChange={(event)=>setAnswer(event.target.value)}/>
-                    <button type="submit">Submit</button>
-
+                ) : null}
+                <form
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    submitAnswer();
+                }}
+                >
+                <button type="button" onClick={listenForAnswer}>
+                    Speak your answer
+                </button>
+                <textarea
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                />
+                <button type="submit">Submit</button>
                 </form>
-                </>
+            </>
             )}
             {report ? (
                 <section>
@@ -403,12 +467,13 @@ export default function App(){
                     <ul>
                     {report.criteria.map((criterion) => (
                         <li key={criterion.name}>
-                        {criterion.name}: {criterion.score} ({criterion.confidence}). Evidence: {criterion.evidence}
+                        {criterion.name}: {criterion.score} ({criterion.confidence}). Evidence: {criterion.evidence}. {criterion.explanation}
                         </li>
                     ))}
                     </ul>
-                    <p>{report.strengths.join(" ")}</p>
-                    <p>{report.improvements.join(" ")}</p>
+                    <p>Strengths: {report.strengths.join(" ")}</p>
+                    <p>Improvements: {report.improvements.join(" ")}</p>
+                    <p>Practice: {report.practiceTopics.join(", ")}</p>
                 </section>
                 ) : null}
             </>

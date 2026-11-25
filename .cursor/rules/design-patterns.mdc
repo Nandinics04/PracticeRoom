@@ -1,0 +1,24 @@
+---
+description: PracticeRoom design patterns for new application code
+alwaysApply: true
+---
+
+# Design patterns
+
+Extend the pattern already used for that responsibility. Do not put a second implementation behind a concrete class in a controller or use case.
+
+- **State.** Only `SessionStateMachine.transition` changes interview status. Loading a saved record may assign the stored status. That load is not a new event.
+- **Factory.** `InterviewSession.create` and `InterviewSession.fromRecord` build sessions. Callers do not use the constructor.
+- **Builder.** `buildInterviewPlan` assembles the plan from configuration and research sources.
+- **Strategy.** `InterviewStrategy` supplies section names and the follow-up sentence. A new interview type is a new strategy.
+- **Port and adapter.** `SearchProvider`, `AnswerEvaluator`, `ReportGenerator`, and `SessionRepository` are the ports. `MockSearchProvider`, `MockAnswerEvaluator`, `MockReportGenerator`, `SessionStore`, and `FileSessionStore` are the adapters. A controller or use case depends on the port.
+- **Repository.** `SessionRepository` is the session collection. The Nest module chooses `SessionStore` or `FileSessionStore`. The controller receives the port through an injection token.
+- **Use case.** `prepareInterview`, `answerInterview`, and `reportInterview` coordinate the ports. The session applies the result.
+
+```ts
+// Controller depends on the port
+constructor(@Inject(SESSION_REPOSITORY) private readonly store: SessionRepository) {}
+
+// Module selects the adapter
+{ provide: SESSION_REPOSITORY, useClass: FileSessionStore }
+```

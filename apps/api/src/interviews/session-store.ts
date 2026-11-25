@@ -1,9 +1,10 @@
 // import { Injectable } from "@nestjs/common";
 import { InterviewSession } from "./interview-session";
 import { NotFoundException } from "@nestjs/common";
+import type { SessionRepository } from "./session-repository";
 
 // @Injectable()
-export class SessionStore{
+export class SessionStore implements SessionRepository{
     private readonly sessions=new Map<string, InterviewSession>();
 
      save(id: string, session: InterviewSession): void{
@@ -16,11 +17,12 @@ export class SessionStore{
         }
         return session;
      }
-     list(): { id: string; status: string; title?: string }[] {
+     list(): { id: string; status: string; title?: string; interviewType: string }[] {
       return [...this.sessions.entries()].map(([id, session]) => ({
         id,
         status: session.status,
         title: session.plan?.title,
+        interviewType: session.interviewType,
       }));
     }
 }

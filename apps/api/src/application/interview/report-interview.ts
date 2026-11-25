@@ -17,6 +17,6 @@ export function reportInterview(session: InterviewSession, generator: ReportGene
         throw new Error("Finish the interview before generating a report");
     }
     const feedback=generator.generate(session.transcript);
-    session.markReportReady();
+    session.markReportReady(feedback);
     return feedback;
 }

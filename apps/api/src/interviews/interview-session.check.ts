@@ -61,6 +61,10 @@ assert.throws(() => reportInterview(session, new MockReportGenerator()));
 assert.throws(() => answerInterview(session, longAnswer, new MockAnswerEvaluator()));
 
 
+const restored = InterviewSession.fromRecord(session.toRecord());
+assert.equal(restored.status, "report_ready");
+assert.equal(restored.interviewType, "technical");
+assert.equal(restored.transcript[0].answer, "too short");
 
 console.log("interview session ok");
 }
