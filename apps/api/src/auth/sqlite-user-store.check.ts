@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SqliteUserStore } from "./sqlite-user-store.ts";
+import { EmailAlreadyUsed } from "./user-repository.ts";
+
+const filePath = join(mkdtempSync(join(tmpdir(), "practice-room-users-")), "sessions.sqlite");
+const store = new SqliteUserStore(filePath);
+assert.equal(store.count(), 0);
+const created = store.create({ name: "Nandini", email: "Nandini@example.com", password: "practice1" });
+assert.equal(created.email, "nandini@example.com");
+assert.equal(created.targetRole, "");
+assert.throws(() => store.create({ name: "Nandini", email: "nandini@example.com", password: "practice1" }), EmailAlreadyUsed);
+assert.equal(store.authenticate("nandini@example.com", "wrong-password"), null);
+const session = store.authenticate("nandini@example.com", "practice1");
+assert.ok(session);
+assert.equal(store.findByToken(session.token)?.name, "Nandini");
+const saved = store.saveProfile(created.id, { targetRole: "Software Engineer", experienceLevel: "mid", goal: "campus" });
+assert.equal(saved.targetRole, "Software Engineer");
+assert.equal(store.findByToken(session.token)?.goal, "campus");
+store.revoke(session.token);
+assert.equal(store.findByToken(session.token), null);
+console.log("user accounts ok");

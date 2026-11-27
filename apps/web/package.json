@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@ricky0123/vad-web": "^0.0.31",
+    "kokoro-js": "^1.2.1",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

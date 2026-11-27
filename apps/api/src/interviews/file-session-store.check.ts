@@ -23,4 +23,8 @@ const reloaded = new FileSessionStore(filePath);
 assert.equal(reloaded.get("interview-1").status, "draft");
 assert.equal(reloaded.get("interview-1").interviewType, "technical");
 assert.throws(() => reloaded.get("missing"));
+reloaded.delete("interview-1");
+assert.throws(() => reloaded.get("interview-1"));
+const afterDelete = new FileSessionStore(filePath);
+assert.throws(() => afterDelete.get("interview-1"));
 console.log("file session store ok");

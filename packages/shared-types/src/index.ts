@@ -3,6 +3,8 @@ export type{
     InterviewType,
     ExperienceLevel,
     Difficulty,
+    InterviewerPersona,
+    PracticeMode,
     JobContent,
     InterviewConfiguration,
     InterviewStatus,
@@ -18,5 +20,9 @@ export type{
     ScoreConfidence,
     FeedbackCriterionName,
     FeedbackCriterion,
+    ScoreFigure,
+    QuestionScore,
+    TurnMeasure,
     InterviewFeedback,
 } from "./interview";
+export type { PracticeAccount, PracticeGoal } from "./account";

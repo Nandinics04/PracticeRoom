@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { toInterviewConfiguration } from "./configuration.ts";
-import { buildResearchQueries, mockFetchPublicPages } from "./research.ts";
+import { buildResearchQueries, mockFetchPublicPages, suppliedMaterialQueries } from "./research.ts";
 
 const job = toInterviewConfiguration({
   mode: "job",

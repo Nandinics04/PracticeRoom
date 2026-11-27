@@ -10,11 +10,14 @@ export type InterviewType=
 export type ExperienceLevel = "entry" | "mid" | "senior";
 
 export type Difficulty = "easy" | "medium" | "hard";
+export type InterviewerPersona = "coach" | "recruiter" | "bar_raiser";
+export type PracticeMode = "coach" | "real";
 export type JobContent={
     company: string;
     role: string;
     description: string;
     url?: string;
+    materials?: string;
 };
 export type JobInterviewInput={
     mode: "job";
@@ -28,6 +31,10 @@ export type JobInterviewInput={
     difficulty: Difficulty;
     durationMinutes: number;
     focusAreas?: string[];
+    resume?: string;
+    materials?: string;
+    persona?: InterviewerPersona;
+    practiceMode?: PracticeMode;
 };
 export type SkillInterviewInput={
     mode: "skill";
@@ -37,6 +44,10 @@ export type SkillInterviewInput={
     difficulty: Difficulty;
     durationMinutes: number;
     focusAreas?: string[];
+    resume?: string;
+    materials?: string;
+    persona?: InterviewerPersona;
+    practiceMode?: PracticeMode;
 }
 export type InterviewStatus= "draft" | "preparing" | "ready" | "live" | "completed" | "report_ready" | "failed";
 export type SessionEvent="prepare"| "plan_ready" | "start"| "end" | "report_ready" | "fail";
@@ -51,9 +62,13 @@ export type InterviewConfiguration={
     focusAreas: string[];
     round?: string;
     job?: JobContent;
+    resume?: string;
+    materials?: string;
+    persona: InterviewerPersona;
+    practiceMode: PracticeMode;
 }
 
-export type PublicPlatform="leetcode" | "glassdoor" | "geeksforgeeks"| "medium"| "reddit"| "linkedin" | "AmbitionBox" | "ziprecruiter" | "stackoverflow" | "github" | "IGotAnOffer" | "Blind"| "CareerCup" | "company_site";
+export type PublicPlatform="leetcode" | "glassdoor" | "geeksforgeeks"| "medium"| "reddit"| "linkedin" | "AmbitionBox" | "ziprecruiter" | "stackoverflow" | "github" | "IGotAnOffer" | "Blind"| "CareerCup" | "company_site" | "supplied";
 export type ResearchSource={
     platform: PublicPlatform;
     title: string;
@@ -98,10 +113,44 @@ export type FeedbackCriterion={
     confidence: ScoreConfidence;
 };
 
+export type ScoreFigure={
+    name: string;
+    score: number;
+    detail: string;
+    needsWork: boolean;
+};
+
+export type QuestionScore={
+    prompt: string;
+    score: number;
+    note: string;
+    worked?: string;
+    missing?: string;
+    action?: string;
+    honestPass?: boolean;
+};
+
+export type TurnMeasure={
+    prompt: string;
+    wpm: number;
+    thinkSeconds: number;
+    seconds: number;
+    action: string;
+};
+
 export type InterviewFeedback={
     overallScore: number;
     criteria: FeedbackCriterion[];
     strengths: string[];
     improvements:string[];
     practiceTopics: string[];
+    content?: ScoreFigure[];
+    delivery?: ScoreFigure[];
+    presence?: ScoreFigure[];
+    questions?: QuestionScore[];
+    idealAnswer?: string;
+    focus?: string[];
+    pillars?: ScoreFigure[];
+    turns?: TurnMeasure[];
+    brushUp?: string[];
 }

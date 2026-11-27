@@ -1,0 +1,528 @@
+.studio {
+  display: flow-root;
+  min-height: 100vh;
+  background: #101012;
+  color: #f4f1ea;
+}
+
+.studio-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  height: 56px;
+  padding: 0 1rem;
+  border-bottom: 1px solid #2a2a30;
+}
+
+.studio-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-weight: 650;
+}
+
+.studio-brand span {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  background: #f4f1ea;
+  color: #16161a;
+  font-size: 0.72rem;
+}
+
+.studio-crumb,
+.engine,
+.studio-quiet,
+.privacy,
+.banks p {
+  color: #b9b3a8;
+}
+
+.studio-crumb,
+.engine {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.engine i {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: #3dce8d;
+}
+
+.studio-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: #1b1b20;
+}
+
+.studio button.tab,
+.studio button.pill,
+.studio button.drawer,
+.studio .session-list button,
+.studio-user button {
+  border: 0;
+  background: transparent;
+  color: #d9d3c8;
+}
+
+.studio button.tab.on,
+.studio button.pill.on {
+  background: #2a2a31;
+  color: #f4f1ea;
+}
+
+.studio button.tab em {
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #3dce8d;
+  color: #102117;
+  font-style: normal;
+  font-size: 0.72rem;
+}
+
+.studio-user {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.studio-user input,
+.launcher input,
+.launcher textarea,
+.launcher select,
+.studio-nav input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #34343a;
+  border-radius: 12px;
+  background: #17171b;
+  color: #f4f1ea;
+}
+
+.studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.75fr);
+  gap: 1rem;
+  width: min(1180px, calc(100% - 2rem));
+  margin: 1rem auto;
+  padding-bottom: 2rem;
+}
+
+.studio-grid.single,
+.banks {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+  width: min(1180px, calc(100% - 2rem));
+  margin: 1rem auto;
+}
+
+.launcher,
+.sessions-panel,
+.brush,
+.pillars,
+.banks,
+.bento article {
+  padding: 1rem;
+  border: 1px solid #2c2c33;
+  border-radius: 18px;
+  background: #17171b;
+}
+
+.launcher h2,
+.sessions-panel h2,
+.brush h2,
+.pillars h2,
+.banks h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.05rem;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pills select {
+  width: auto;
+}
+
+.launcher-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+}
+
+.launcher-fields label,
+.materials label {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 180px;
+  color: #d9d3c8;
+  font-size: 0.78rem;
+}
+
+.company-field {
+  position: relative;
+}
+
+.suggest {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  display: grid;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  border: 1px solid #34343a;
+  border-radius: 12px;
+  background: #121216;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+}
+
+.suggest button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #f4f1ea;
+  text-align: left;
+}
+
+.suggest button:hover {
+  background: #2a2a31;
+}
+
+.launcher-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem 0.8rem;
+  margin-top: 0.85rem;
+}
+
+.launcher-foot .prepare {
+  margin: 0 0 0 auto;
+}
+
+.ready-room .prepare {
+  margin-top: 0.9rem;
+  margin-left: auto;
+}
+
+.materials {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.prepare {
+  display: block;
+  border: 0;
+  border-radius: 12px;
+  background: #f4f1ea;
+  color: #16161a;
+  font-weight: 700;
+}
+
+.studio-grid > div,
+.studio-grid > aside {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.bento article {
+  display: flex;
+  flex-direction: column;
+  min-height: 132px;
+}
+
+.bento span,
+.bento em,
+.session-list span,
+.session-list em,
+.brush small {
+  display: block;
+  color: #b9b3a8;
+  font-style: normal;
+  font-size: 0.78rem;
+}
+
+.bento strong {
+  display: block;
+  margin: 0.35rem 0;
+  font-size: 1.55rem;
+}
+
+.session-list,
+.brush ul,
+.pillars ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-list li,
+.brush li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.7rem;
+  border-radius: 14px;
+  background: #121216;
+}
+
+.session-copy strong,
+.session-copy span,
+.session-copy em {
+  display: block;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.brush li {
+  grid-template-columns: 1fr auto;
+}
+
+.state {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #3a3a42;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.state-report_ready,
+.state-completed {
+  border-color: #3dce8d;
+  color: #b7f3d4;
+}
+
+.pillars li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.6rem;
+}
+
+.pillars i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: #f4f1ea;
+}
+
+.privacy,
+.studio-error {
+  margin: 0.8rem 0 0;
+}
+
+.studio-error {
+  width: min(1180px, calc(100% - 2rem));
+  margin: 0.8rem auto 0;
+  color: #f3c7be;
+}
+
+.ready-room .studio-nav {
+  height: auto;
+  min-height: 56px;
+}
+
+.ready-room .studio-crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ready-room .studio-nav .back-studio {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid #3a3a42;
+  border-radius: 999px;
+  background: #17171b;
+  color: #f4f1ea;
+  padding: 0.4rem 0.8rem;
+}
+
+.ready-room .studio-nav .state {
+  margin-left: 0;
+  flex: none;
+}
+
+.context-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #3a3a42;
+  border-radius: 999px;
+  color: #d9d3c8;
+  font-size: 0.82rem;
+}
+
+.chip.on {
+  border-color: #3dce8d;
+  color: #b7f3d4;
+}
+
+.context-box {
+  min-height: 7rem;
+  margin: 0.4rem 0 0.9rem;
+  padding: 0.8rem;
+  border-radius: 14px;
+  background: #121216;
+  color: #d9d3c8;
+  white-space: pre-wrap;
+}
+
+.sections {
+  margin-top: 0.9rem;
+  color: #d9d3c8;
+}
+
+.sections ol {
+  margin: 0.5rem 0 0;
+}
+
+.preview {
+  position: relative;
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #121216;
+}
+
+.preview video {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  background: #101012;
+}
+
+.preview .frame {
+  position: absolute;
+  width: 46%;
+  height: 68%;
+  border: 2px solid #3dce8d;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.preview p {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  margin: 0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: #102117;
+  color: #b7f3d4;
+  font-size: 0.75rem;
+}
+
+.checks {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checks li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.checks em,
+.studio-quiet {
+  color: #b9b3a8;
+  font-style: normal;
+  font-size: 0.78rem;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+}
+
+.meter b {
+  width: 3px;
+  height: 16px;
+  border-radius: 99px;
+  background: #3dce8d;
+  transform-origin: center;
+}
+
+.checks button {
+  border: 1px solid #3a3a42;
+  border-radius: 999px;
+  background: transparent;
+  color: #f4f1ea;
+}
+
+@media (max-width: 960px) {
+  .studio-nav {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 0.7rem 1rem;
+  }
+
+  .studio-grid,
+  .launcher-fields,
+  .session-list li {
+    grid-template-columns: 1fr;
+  }
+
+  .session-actions,
+  .launcher-foot {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .launcher-foot .prepare {
+    margin-left: 0;
+  }
+}

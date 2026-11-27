@@ -19,4 +19,6 @@ const session= InterviewSession.create(
 store.save("interview-1", session);
 assert.equal(store.get("interview-1")?.status, "draft");
 assert.throws(() => store.get("missing"));
+store.delete("interview-1");
+assert.throws(() => store.get("interview-1"));
 console.log("session store ok");

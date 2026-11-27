@@ -13,6 +13,8 @@ const job = toInterviewConfiguration({
     focusAreas: ["SQL"],
 
 })
+assert.equal(job.persona, "recruiter");
+assert.equal(job.practiceMode, "real");
 assert.equal(job.mode, "job");
 assert.equal(job.job?.company, "Google");
 assert.deepEqual(job.skills, []);

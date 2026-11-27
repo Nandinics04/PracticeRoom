@@ -15,6 +15,7 @@ const job = toInterviewConfiguration({
   durationMinutes: 45,
 });
 
+async function main() {
 const all = await runPublicResearch(job, new MockSearchProvider());
 assert.equal(all.length, 14);
 
@@ -46,4 +47,21 @@ const skill = toInterviewConfiguration({
 });
 assert.deepEqual(await runPublicResearch(skill, new MockSearchProvider()), []);
 
+const guided = toInterviewConfiguration({
+  mode: "job",
+  company: "Amazon",
+  role: "SDE Intern",
+  description: "Build reliable services.",
+  interviewType: "technical",
+  experienceLevel: "entry",
+  difficulty: "medium",
+  durationMinutes: 45,
+  materials: "https://leetcode.com/discuss/post/8428320/example Focus on arrays and two pointers.",
+});
+const guidedSources = await runPublicResearch(guided, new MockSearchProvider());
+assert.equal(guidedSources.length, 1);
+assert.equal(guidedSources[0].platform, "supplied");
+
 console.log("public research service ok");
+}
+main();

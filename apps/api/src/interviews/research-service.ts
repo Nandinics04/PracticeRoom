@@ -1,11 +1,21 @@
 import type {InterviewConfiguration, ResearchSource} from "@practice-room/shared-types"
-import {buildResearchQueries} from "./research";
+import {buildResearchQueries, suppliedMaterialQueries} from "./research";
 import type {SearchProvider} from "./search-provider";
 
 export async function runPublicResearch(
     config: InterviewConfiguration,
     provider: SearchProvider,
 ): Promise<ResearchSource[]> {
+    const notes = (config.materials ?? config.job?.materials ?? "").trim();
+    if (notes) {
+        const url = notes.match(/https?:\/\/\S+/)?.[0]?.replace(/[),.;]+$/, "") ?? "supplied://notes";
+        return [{
+            platform: "supplied",
+            title: "Notes you supplied",
+            url,
+            excerpt: notes.slice(0, 2000),
+        }];
+    }
     const queries=buildResearchQueries(config);
     const results=await Promise.allSettled(queries.map(async (query)=>provider.search(query)));
 
