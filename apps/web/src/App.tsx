@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { cancelInterviewer, prepareInterviewerVoice, speakAsInterviewer, unlockInterviewerVoice } from "./interviewer-voice";
+
+prepareInterviewerVoice("No problem at all.");
+prepareInterviewerVoice("That makes sense.");
 import { openTurnEar, wavFromSpeech, type TurnEar } from "./turn-vad";
 import "./App.css";
 import { Dashboard } from "./dashboard/Dashboard";
@@ -35,6 +38,7 @@ type CreatedInterview={
     practiceMode?: string;
     durationMinutes?: number;
     startedAt?: string | null;
+    startsAt?: string | null;
     wrapUpUntil?: string | null;
     company?: string;
     role?: string;
@@ -42,6 +46,7 @@ type CreatedInterview={
     context?: string;
     source?: string;
     persona?: string;
+    codingLanguage?: string;
 };
 type InterviewTurn={
     status: string;
@@ -117,13 +122,9 @@ type InterviewSummary={
     source?: string;
 };
 
-function openingLine(name: string, topic: string, coding = false) {
-    const who = name.trim() || "there";
+function openingLine(topic: string) {
     const role = topic.trim() || "this role";
-    if (coding) {
-        return `Hi ${who}, thanks for joining. The ${role} problem is on the left, with the constraints and an example. Walk me through your approach, then write the function.`;
-    }
-    return `Hi ${who}, thanks for joining. Let's start with a short introduction for ${role}. Tell me about a project you owned, and what your part in it was.`;
+    return `Hi, thanks for joining. I'll let you start us off for ${role}. Say hello, tell me your name, and a little about yourself.`;
 }
 
 function spokenLine(prompt: string){
@@ -140,11 +141,12 @@ function spokenLine(prompt: string){
             : prompt;
     const text = source.replace(/\s+/g, " ").trim();
     const noise = /browser extension|salary calculator|employees choice|hello, guest|rate now|are you paid fairly|login for employers|compare companies/i;
-    if (!noise.test(text) && text.length <= 900) {
-        return text;
-    }
-    const question = text.match(/[A-Z][^?]{12,160}\?/g)?.find((line) => !noise.test(line));
-    return question?.trim() || "Tell me about a project you owned. What was your part in it?";
+    const usable = !noise.test(text) && text.length <= 900
+        ? text
+        : text.match(/[A-Z][^?]{12,160}\?/g)?.find((line) => !noise.test(line))?.trim()
+            || "Tell me about a project you owned. What was your part in it?";
+    const sentences = usable.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [usable];
+    return sentences.slice(0, 2).join(" ").replace(/\s+/g, " ").trim();
 }
 
 function readableResume(text: string) {
@@ -209,6 +211,36 @@ function leaveFullscreen() {
     }
 }
 
+type ClockHold = { id: string; pausedMs: number; leftAt: number | null };
+
+function readClock(): ClockHold | null {
+    try {
+        const raw = sessionStorage.getItem("practice-room-clock");
+        if (!raw) {
+            return null;
+        }
+        const parsed = JSON.parse(raw) as Partial<ClockHold>;
+        if (!parsed.id || typeof parsed.pausedMs !== "number") {
+            return null;
+        }
+        return { id: parsed.id, pausedMs: parsed.pausedMs, leftAt: typeof parsed.leftAt === "number" ? parsed.leftAt : null };
+    } catch {
+        return null;
+    }
+}
+
+function writeClock(hold: ClockHold | null) {
+    try {
+        if (!hold) {
+            sessionStorage.removeItem("practice-room-clock");
+            return;
+        }
+        sessionStorage.setItem("practice-room-clock", JSON.stringify(hold));
+    } catch {
+        // The timer still works for this page view.
+    }
+}
+
 export default function App(){
     const [result, setResult]=useState<CreatedInterview|null>(null);
     const [error, setError]=useState("");
@@ -218,6 +250,7 @@ export default function App(){
     const [description, setDescription]=useState("Build reliable backend services.");
     const [skills, setSkills]=useState("JavaScript");
     const [interviewType, setInterviewType]=useState("technical");
+    const [codingLanguage, setCodingLanguage]=useState("typescript");
     const [goal, setGoal]=useState("");
     const [experienceLevel, setExperienceLevel]=useState("mid");
     const [difficulty, setDifficulty]=useState("medium");
@@ -240,14 +273,18 @@ export default function App(){
     const [draftName, setDraftName]=useState("");
     const [speaker, setSpeaker]=useState<"" | "interviewer" | "candidate">("");
     const [voicePhase, setVoicePhase]=useState<"" | "preparing" | "speaking">("");
+    const [audible, setAudible]=useState("");
 
     const [turn, setTurn]=useState<InterviewTurn|null>(null);
     const [clockNow, setClockNow]=useState(() => Date.now());
+    const pausedMs = useRef(0);
+    const clockPause = useRef<ClockHold | null>(readClock());
+    const clockTimer = useRef(0);
     const [lines, setLines]=useState<SpokenLine[]>([]);
-    const [openingPrompt, setOpeningPrompt]=useState("");
 
     const [answer, setAnswer]=useState("");
     const [code, setCode]=useState("");
+    const [problemText, setProblemText]=useState("");
     const [consoleText, setConsoleText]=useState("");
     const [codeRunning, setCodeRunning]=useState(false);
 
@@ -265,6 +302,7 @@ export default function App(){
     const cameraAllowed=useRef(false);
     const releaseCameraRef=useRef<() => void>(() => {});
     const speakToken=useRef(0);
+    const voiceReadyFor=useRef("");
     const spokenPrompt=useRef("");
     const keepListening=useRef(false);
     const recognitionRef=useRef<{ stop: () => void } | null>(null);
@@ -382,12 +420,16 @@ export default function App(){
         void earRef.current?.pause();
         unlockInterviewerVoice();
         setVoicePhase("preparing");
+        setAudible("");
         setSpeaker("");
-        void speakAsInterviewer(line, (phase) => {
+        void speakAsInterviewer(line, (phase, heard) => {
             if (speakToken.current !== token) {
                 return;
             }
             setVoicePhase(phase);
+            if (heard) {
+                setAudible(heard);
+            }
             setSpeaker(phase === "speaking" ? "interviewer" : "");
         }).finally(() => {
             if (speakToken.current !== token) {
@@ -401,13 +443,65 @@ export default function App(){
             void earRef.current?.start();
         });
     }
-    useEffect(() => {
-        if (place !== "room" || result?.status !== "live" || !result.startedAt) {
+    function freezeLiveClock(id: string) {
+        const held = clockPause.current ?? readClock();
+        if (held?.id === id && held.leftAt != null) {
             return;
         }
-        const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
-        return () => window.clearInterval(timer);
-    }, [place, result?.status, result?.startedAt]);
+        const next = { id, pausedMs: held?.id === id ? held.pausedMs : pausedMs.current, leftAt: Date.now() };
+        clockPause.current = next;
+        pausedMs.current = next.pausedMs;
+        writeClock(next);
+        window.clearInterval(clockTimer.current);
+        clockTimer.current = 0;
+    }
+    useEffect(() => {
+        const inRoom = place === "room" && result?.status === "live" && Boolean(result.startedAt) && !turn?.done;
+        if (!inRoom || !result?.id) {
+            const held = clockPause.current ?? readClock();
+            if (held && held.leftAt == null) {
+                const frozen = { ...held, leftAt: Date.now() };
+                clockPause.current = frozen;
+                writeClock(frozen);
+            }
+            return;
+        }
+        const id = result.id;
+        const held = clockPause.current ?? readClock();
+        const paused = held?.id === id ? held.pausedMs + (held.leftAt ? Date.now() - held.leftAt : 0) : 0;
+        pausedMs.current = paused;
+        const running = { id, pausedMs: paused, leftAt: null };
+        clockPause.current = running;
+        writeClock(running);
+        setClockNow(Date.now());
+        window.clearInterval(clockTimer.current);
+        clockTimer.current = window.setInterval(() => setClockNow(Date.now()), 1000);
+        return () => {
+            window.clearInterval(clockTimer.current);
+            clockTimer.current = 0;
+            const current = clockPause.current;
+            if (current?.id === id && current.leftAt == null) {
+                const frozen = { id, pausedMs: pausedMs.current, leftAt: Date.now() };
+                clockPause.current = frozen;
+                writeClock(frozen);
+            }
+        };
+    }, [place, result?.status, result?.startedAt, result?.id, turn?.done]);
+    useEffect(() => {
+        if (place !== "briefing" || !result?.id) {
+            return;
+        }
+        if (result.status !== "preparing") {
+            return;
+        }
+        const id = result.id;
+        const poll = window.setInterval(() => {
+            void refreshScheduled(id);
+        }, 4000);
+        return () => {
+            window.clearInterval(poll);
+        };
+    }, [place, result?.id, result?.status]);
     useEffect(() => {
         const read = () => setTabFocused(!document.hidden);
         document.addEventListener("visibilitychange", read);
@@ -477,13 +571,6 @@ export default function App(){
             void audio?.close();
         };
     }, [speaker]);
-
-    useEffect(()=>{
-        const text = turn?.done ? "" : spokenLine(turn?.prompt || openingPrompt);
-        if (text) {
-            prepareInterviewerVoice(text);
-        }
-    }, [turn?.prompt, turn?.done, openingPrompt])
 
     useEffect(() => {
         if (place !== "room" || result?.status !== "live") {
@@ -689,6 +776,7 @@ export default function App(){
     speakRef.current=beginSpeech;
     function rearmTurn(){
         setPending("");
+        setVoicePhase("");
         setError("Didn't catch that clearly. Try speaking a bit closer to the mic.");
         listenRef.current();
         void earRef.current?.pause().then(() => earRef.current?.start()).catch(() => {});
@@ -789,7 +877,6 @@ export default function App(){
           cancelInterviewer();
           stopListening();
           releaseCamera();
-          setOpeningPrompt("");
         }
         const response = await api(`http://localhost:3000/api/v1/interviews/${id}`, { method: "DELETE" });
         if (!response.ok) {
@@ -806,6 +893,38 @@ export default function App(){
           setCode("");
         }
         void loadInterviews();
+      }
+      async function refreshScheduled(id: string) {
+        const response = await api(`http://localhost:3000/api/v1/interviews/${id}`);
+        if (!response.ok) {
+          return;
+        }
+        const saved = await response.json() as {
+          status: string;
+          title?: string;
+          sections?: {name: string; minutes: number}[];
+          sourceUrls?: string[];
+          startsAt?: string | null;
+          context?: string;
+          source?: string;
+          problem?: string;
+        };
+        setResult((current) => current?.id === id ? {
+          ...current,
+          status: saved.status,
+          title: saved.title || current.title,
+          sections: saved.sections ?? current.sections,
+          sourceUrls: saved.sourceUrls ?? current.sourceUrls,
+          startsAt: saved.startsAt ?? current.startsAt,
+          context: saved.context ?? current.context,
+          source: saved.source ?? current.source,
+        } : current);
+        if (saved.problem) {
+          setProblemText(saved.problem);
+        }
+        if (saved.status === "failed") {
+          setError("The questions could not be prepared. Go back and prepare the room again.");
+        }
       }
       async function openInterview(id: string) {
         setError("");
@@ -830,6 +949,7 @@ export default function App(){
         practiceMode?: string;
         durationMinutes?: number;
         startedAt?: string | null;
+        startsAt?: string | null;
         wrapUpUntil?: string | null;
         company?: string;
         role?: string;
@@ -838,6 +958,9 @@ export default function App(){
         source?: string;
         persona?: string;
         prompt?: string;
+        problem?: string;
+        codingLanguage?: string;
+        preload?: string;
         sectionName?: string;
         done?: boolean;
         feedback?: InterviewReport | null;
@@ -846,8 +969,9 @@ export default function App(){
         stopListening();
         setLines([]);
         setAnswer("");
-        setCode(saved.interviewType === "coding" && saved.status === "live" ? starterFor(editorLanguage(saved.title || "")) : "");
+        setCode(saved.interviewType === "coding" && saved.status === "live" ? starterFor(editorLanguage(saved.title || "", saved.codingLanguage)) : "");
         setReport(saved.feedback ? { ...saved.feedback, said: saved.said ?? saved.feedback.said } : null);
+        setProblemText(saved.problem || "");
         sessionStorage.setItem("practice-room-interview", saved.id);
         setResult({
           id: saved.id,
@@ -859,6 +983,7 @@ export default function App(){
           practiceMode: saved.practiceMode,
           durationMinutes: saved.durationMinutes,
           startedAt: saved.startedAt,
+          startsAt: saved.startsAt,
           wrapUpUntil: saved.wrapUpUntil,
           company: saved.company,
           role: saved.role,
@@ -866,17 +991,25 @@ export default function App(){
           context: saved.context,
           source: saved.source,
           persona: saved.persona,
+          codingLanguage: saved.codingLanguage,
         });
-        if (saved.status === "ready") {
+        const held = saved.status === "preparing" || saved.status === "failed";
+        if (saved.status === "ready" || held) {
           setPlace("briefing");
-          unlockInterviewerVoice();
-          const opening = openingLine(spokenName.trim() || userName, saved.title || "", saved.interviewType === "coding");
-          prepareInterviewerVoice(opening);
-          setOpeningPrompt(opening);
+          if (saved.status === "ready") {
+            unlockInterviewerVoice();
+            const opening = spokenLine(openingLine(saved.title || ""));
+            prepareInterviewerVoice(opening);
+            if (saved.preload) {
+              prepareInterviewerVoice(spokenLine(saved.preload));
+            }
+          }
+          if (saved.status === "failed") {
+            setError("The questions could not be prepared. Go back and prepare the room again.");
+          }
           return;
         }
         setPlace("room");
-        setOpeningPrompt("");
         if (saved.prompt) {
           setTurn({
             status: saved.status,
@@ -891,11 +1024,16 @@ export default function App(){
         }
         if (saved.status === "live" && saved.prompt && !saved.done) {
           unlockInterviewerVoice();
-          beginSpeech(saved.prompt);
+          if (!/^problem statement/i.test(saved.prompt)) {
+            beginSpeech(saved.prompt);
+          }
           void startCamera();
         }
       }
       function backToLobby() {
+        if (place === "room" && result?.status === "live" && result.startedAt && !turn?.done) {
+            freezeLiveClock(result.id);
+        }
         leaveFullscreen();
         cancelInterviewer();
         stopListening();
@@ -907,7 +1045,7 @@ export default function App(){
         setReport(null);
         setAnswer("");
         setCode("");
-        setOpeningPrompt("");
+        setProblemText("");
         setSpeaker("");
         setVoicePhase("");
       }
@@ -923,13 +1061,11 @@ export default function App(){
             setPending("");
             return;
         }
-      const topic = mode === "job"
-        ? `${role.trim()} at ${company.trim()}`
-        : skills.split(",").map((skill) => skill.trim()).filter(Boolean).join(", ");
-      if(topic){
-        unlockInterviewerVoice();
-        prepareInterviewerVoice(openingLine(spokenName.trim() || userName, topic, interviewType === "coding"));
-      }
+      if(interviewType === "technical" && !resume.trim()){
+            setError("Add a resume for a technical round. The questions come from it, plus a puzzle and the job requirements.");
+            setPending("");
+            return;
+        }
       const body = mode === "job"
         ? {
             mode,
@@ -937,6 +1073,7 @@ export default function App(){
             role: role.trim(),
             description: description.trim() || `${role.trim()} at ${company.trim()}. ${interviewType} interview.`,
             interviewType,
+            ...(interviewType === "coding" ? { codingLanguage } : {}),
             experienceLevel,
             difficulty,
             durationMinutes: Number(durationMinutes),
@@ -949,6 +1086,7 @@ export default function App(){
             mode,
             skills: skills.split(",").map((skill) => skill.trim()).filter(Boolean),
             interviewType,
+            ...(interviewType === "coding" ? { codingLanguage } : {}),
             experienceLevel,
             difficulty,
             durationMinutes: Number(durationMinutes),
@@ -984,11 +1122,14 @@ export default function App(){
             return;
         }
         const codingRoom = result.interviewType === "coding";
-        const greeting = openingLine(spokenName.trim() || userName, result.title || "", codingRoom);
+        const greeting = spokenLine(openingLine(result.title || ""));
         if (codingRoom && !code.trim()) {
-            setCode(starterFor(editorLanguage(result.title || "")));
+            setCode(starterFor(editorLanguage(result.title || "", result.codingLanguage)));
         }
-        setOpeningPrompt(greeting);
+        setPlace("room");
+        setTurn({ status: "live", sectionName: "Introduction", prompt: greeting, done: false });
+        setLines([{ role: "interviewer", text: greeting }]);
+        setResult({ ...result, status: "live" });
         beginSpeech(greeting);
         setError("");
         setPending("start");
@@ -999,14 +1140,21 @@ export default function App(){
         );
         if(!response.ok){
             cancelInterviewer();
+            setPlace("briefing");
+            setResult({ ...result, status: "ready" });
             setError(await response.text() || `Start failed: ${response.status}`);
             return;
         }
         const next=await response.json();
-        setPlace("room");
-        const shown = codingRoom && typeof next.prompt === "string" && next.prompt.trim() ? next.prompt : greeting;
+        const shown = next.sectionName === "Introduction" && typeof next.prompt === "string" && next.prompt.trim() ? spokenLine(next.prompt) : greeting;
+        if (typeof next.problem === "string" && next.problem.trim()) {
+            setProblemText(next.problem);
+        }
         setTurn({ ...next, prompt: shown, sectionName: next.sectionName || "Introduction" });
-        setLines([{role: "interviewer", text: spokenLine(codingRoom ? greeting : shown)}]);
+        if (typeof next.preload === "string" && next.preload.trim()) {
+            prepareInterviewerVoice(spokenLine(next.preload));
+        }
+        setLines([{role: "interviewer", text: spokenLine(shown)}]);
         setResult({...result, status: next.status, durationMinutes: next.durationMinutes ?? result.durationMinutes, startedAt: next.startedAt ?? result.startedAt, wrapUpUntil: next.wrapUpUntil ?? result.wrapUpUntil});
         if(next.status === "live"){
             void startCamera();
@@ -1027,6 +1175,8 @@ export default function App(){
         const recording=line ? null : supplied ?? await finishRecording();
         stopListening();
         setError("");
+        setVoicePhase("preparing");
+        setAudible("");
         setPending(line ? "answer" : "hear");
         let spoken=line || answer.trim();
         let fromWhisper=false;
@@ -1089,12 +1239,14 @@ export default function App(){
                         tabAwayMs: awayMs,
                         faces,
                         latencyMs: firstHeard.current && questionReady.current ? firstHeard.current - questionReady.current : 0,
+                        pausedMs: pausedMs.current,
                     },
                 }),
             },
         );
         if(!response.ok){
             const raw = await response.text();
+            setVoicePhase("");
             try {
                 const detail = JSON.parse(raw) as {message?: string};
                 setError(detail.message || raw);
@@ -1105,6 +1257,9 @@ export default function App(){
         }
         const next=await response.json();
         const heard=typeof next.answer === "string" && next.answer.trim() ? next.answer.trim() : spoken;
+        if (typeof next.problem === "string" && next.problem.trim()) {
+            setProblemText(next.problem);
+        }
         setTurn(next);
         setLines((current) => [
             ...current,
@@ -1114,8 +1269,10 @@ export default function App(){
         setResult({...result, status: next.status, durationMinutes: next.durationMinutes ?? result.durationMinutes, startedAt: next.startedAt ?? result.startedAt, wrapUpUntil: next.wrapUpUntil ?? result.wrapUpUntil});
         void loadInterviews();
         setAnswer("");
-        setCode("");
-        setConsoleText("");
+        if (result.interviewType !== "coding") {
+            setCode("");
+            setConsoleText("");
+        }
         if(next.done){
             leaveFullscreen();
             releaseCamera();
@@ -1123,9 +1280,17 @@ export default function App(){
             stopListening();
             setVoicePhase("");
             void loadReport();
-        } else if(next.prompt){
+        } else if(next.prompt && !/^problem statement/i.test(next.prompt)){
             beginSpeech(next.prompt);
+            if (typeof next.preload === "string" && next.preload.trim() && !/^problem statement/i.test(next.preload)) {
+                prepareInterviewerVoice(spokenLine(next.preload));
+            }
+        } else {
+            setVoicePhase("");
         }
+        } catch {
+            setVoicePhase("");
+            setError("The interviewer could not take that answer. Submit it again.");
         } finally {
             setPending("");
         }
@@ -1349,24 +1514,31 @@ export default function App(){
     const interviewerSpeaking = speaker === "interviewer";
     const interviewerPreparing = voicePhase === "preparing";
     const spokenNow = turn && !turn.done ? spokenLine(turn.prompt) : "";
+    const withVoice = voicePhase === "speaking" && audible ? audible : spokenNow;
     const clockLabel = (() => {
-        if (place !== "room" || result?.status !== "live" || !result.startedAt || turn?.done) {
+        if (!result?.startedAt || result.status !== "live") {
             return "";
         }
         const started = Date.parse(result.startedAt);
-        if (result.durationMinutes !== 10) {
-            const elapsed = Math.max(0, clockNow - started);
+        const held = clockPause.current ?? readClock();
+        const timePaused = held?.id === result.id ? held.pausedMs : pausedMs.current;
+        const anchor = held?.id === result.id && held.leftAt ? held.leftAt : Math.max(clockNow, Date.now());
+        const now = anchor - timePaused;
+        const minutes = Number(result.durationMinutes);
+        const budgetMs = Number.isFinite(minutes) && minutes > 0 ? minutes * 60 * 1000 : 0;
+        if (!budgetMs) {
+            const elapsed = Math.max(0, now - started);
             return `${Math.floor(elapsed / 60000)}:${String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0")}`;
         }
-        const budgetEnd = started + 10 * 60 * 1000;
+        const budgetEnd = started + budgetMs;
         const closing = turn?.sectionName === "Wrap-up";
-        const end = closing && result.wrapUpUntil ? Date.parse(result.wrapUpUntil) : budgetEnd;
-        const remaining = end - clockNow;
+        const end = closing && result.wrapUpUntil ? Date.parse(result.wrapUpUntil) + timePaused : budgetEnd;
+        const remaining = end - now;
         const text = `${Math.max(0, Math.floor(remaining / 60000))}:${String(Math.max(0, Math.ceil((remaining % 60000) / 1000))).padStart(2, "0")}`;
-        if (closing && clockNow > budgetEnd) {
+        if (minutes === 10 && closing && now > budgetEnd) {
             return remaining > 0 ? `Extra time for this answer: ${text}` : "Extra time for this answer.";
         }
-        if (!closing && remaining <= 0) {
+        if (minutes === 10 && !closing && remaining <= 0) {
             return "Finish this answer. Then we'll wrap up.";
         }
         return `${text} left`;
@@ -1374,7 +1546,7 @@ export default function App(){
     const visibleLines = interviewerPreparing
         ? lines.filter((line) => !(line.role === "interviewer" && line.text === spokenNow))
         : lines;
-    if (place === "briefing" && result?.status === "ready") {
+    if (place === "briefing" && result && (result.status === "ready" || result.status === "preparing" || result.status === "failed")) {
         return (
             <ReadyRoom
                 title={result.title}
@@ -1436,6 +1608,8 @@ export default function App(){
                     onType: setInterviewType,
                     company,
                     onCompany: setCompany,
+                    codingLanguage,
+                    onCodingLanguage: setCodingLanguage,
                     role,
                     onRole: setRole,
                     mode,
@@ -1499,10 +1673,9 @@ export default function App(){
         if (!result) {
             return;
         }
-        const language = editorLanguage(result.title || "");
+        const language = editorLanguage(result.title || "", result.codingLanguage);
         if (!canRun(language)) {
-            setConsoleText("This runner executes JavaScript. The interviewer still receives the code you wrote. Talk through it, or write the same function in JavaScript to run it.");
-            void submitAnswer();
+            setConsoleText("This runner executes JavaScript. The problem and your code stay on screen. Type a doubt and press Ask.");
             return;
         }
         setCodeRunning(true);
@@ -1526,7 +1699,6 @@ export default function App(){
         } finally {
             setCodeRunning(false);
         }
-        void submitAnswer();
     }
     const liveMode = turn?.done
         ? "done"
@@ -1543,7 +1715,7 @@ export default function App(){
             interviewType={result?.interviewType ?? "technical"}
             sections={result?.sections ?? []}
             sectionName={turn?.sectionName || "Introduction"}
-            prompt={turn && !turn.done ? (interviewerPreparing ? "Preparing the question." : spokenNow) : turn?.done ? "That completes the interview." : "Take your seat. The interviewer speaks first."}
+            prompt={turn && !turn.done ? (interviewerPreparing ? "Preparing the question." : withVoice) : turn?.done ? "That completes the interview." : "Take your seat. The interviewer speaks first."}
             hint={result?.practiceMode === "coach" && turn?.hint && !turn.done ? turn.hint : ""}
             mode={liveMode}
             answer={answer}
@@ -1564,12 +1736,14 @@ export default function App(){
             presence={presence}
             tabFocused={tabFocused}
             clock={clockLabel}
-            coding={result?.interviewType === "coding" && Boolean(turn && !turn.done)}
+            coding={result?.interviewType === "coding" && !!turn && !turn.done && turn.sectionName !== "Introduction"}
+            problem={problemText}
             code={code}
             onCode={setCode}
             consoleText={consoleText}
             running={codeRunning}
-            onReset={() => { setCode(result?.interviewType === "coding" ? starterFor(editorLanguage(result.title || "")) : ""); setConsoleText(""); }}
+            onReset={() => { setCode(result?.interviewType === "coding" ? starterFor(editorLanguage(result.title || "", result.codingLanguage)) : ""); setConsoleText(""); }}
+            language={editorLanguage(result?.title || "", result?.codingLanguage)}
             onRun={() => { void runAndSubmit(); }}
             pending={pending}
             error={error}
@@ -1577,9 +1751,15 @@ export default function App(){
             done={Boolean(turn?.done)}
             report={null}
             onListen={() => listenForAnswer()}
-            onFinish={() => { void submitAnswer(); }}
             onSkip={() => { void passTopic(); }}
             onEnd={() => { void endInterview(); }}
+            onFinish={() => {
+                if (result?.interviewType === "coding") {
+                    void submitAnswer(undefined, answer.trim());
+                    return;
+                }
+                void submitAnswer();
+            }}
             onLeave={backToLobby}
         />
     );

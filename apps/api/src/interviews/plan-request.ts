@@ -32,7 +32,7 @@ export function planFromRequest(body: RequestBody): Promise<JobInterviewInput | 
                 return;
             }
             const planned = JSON.parse(stdout) as Record<string, unknown>;
-            const interviewType = oneOf(planned.interviewType, interviewTypes, "behavioral");
+            const interviewType = oneOf(planned.interviewType, interviewTypes, "technical");
             const experienceLevel = oneOf(planned.experienceLevel, levels, "mid");
             const difficulty = oneOf(planned.difficulty, ["easy", "medium", "hard"] as const, "medium");
             const duration = Math.min(30, Math.max(15, Number(planned.durationMinutes) || 20));

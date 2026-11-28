@@ -4,10 +4,11 @@ const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 const VOICE = "af_heart";
 const PACE = 0.88;
 
-type SpeakRequest = { id: number; text: string };
+type SpeakRequest = { id: number; parts: string[]; indexes?: number[]; priority?: boolean };
 type CancelRequest = { cancel: number };
 type SpeakResponse = {
     id: number;
+    part?: number;
     samples?: Float32Array;
     rate?: number;
     done?: boolean;
@@ -16,8 +17,9 @@ type SpeakResponse = {
 };
 
 let model: Promise<KokoroTTS> | null = null;
-let chain: Promise<void> = Promise.resolve();
-let current = 0;
+const dropped = new Set<number>();
+const queue: SpeakRequest[] = [];
+let busy = false;
 
 function interviewerModel() {
     model ??= KokoroTTS.from_pretrained(MODEL, { dtype: "q8", device: "wasm" });
@@ -41,29 +43,58 @@ void interviewerModel().then(() => {
 
 async function speak(request: SpeakRequest) {
     const tts = await interviewerModel();
-    if (current !== request.id) {
+    for (let part = 0; part < request.parts.length; part += 1) {
+        if (dropped.has(request.id)) {
+            return;
+        }
+        const audio = await tts.generate(request.parts[part], { voice: VOICE, speed: PACE });
+        if (dropped.has(request.id)) {
+            return;
+        }
+        const samples = new Float32Array(audio.audio);
+        report({
+            id: request.id,
+            part: request.indexes?.[part] ?? part,
+            samples,
+            rate: audio.sampling_rate,
+            done: part === request.parts.length - 1,
+        }, [samples.buffer]);
+    }
+}
+
+async function drain() {
+    if (busy) {
         return;
     }
-    const audio = await tts.generate(request.text, { voice: VOICE, speed: PACE });
-    if (current !== request.id) {
-        return;
+    busy = true;
+    while (queue.length > 0) {
+        const request = queue.shift();
+        if (!request || dropped.has(request.id)) {
+            continue;
+        }
+        try {
+            await speak(request);
+        } catch (error: unknown) {
+            report({
+                id: request.id,
+                done: true,
+                error: error instanceof Error ? error.message : "The interviewer voice failed",
+            });
+        }
     }
-    const samples = new Float32Array(audio.audio);
-    report({ id: request.id, samples, rate: audio.sampling_rate, done: true }, [samples.buffer]);
+    busy = false;
 }
 
 self.onmessage = (event: MessageEvent<SpeakRequest | CancelRequest>) => {
     if ("cancel" in event.data) {
-        current = 0;
+        dropped.add(event.data.cancel);
         return;
     }
     const request = event.data;
-    current = request.id;
-    chain = chain.then(() => speak(request)).catch((error: unknown) => {
-        report({
-            id: request.id,
-            done: true,
-            error: error instanceof Error ? error.message : "The interviewer voice failed",
-        });
-    });
+    if (request.priority) {
+        queue.unshift(request);
+    } else {
+        queue.push(request);
+    }
+    void drain();
 };

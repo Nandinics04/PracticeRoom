@@ -1,10 +1,12 @@
 # PracticeRoom
 
-PracticeRoom is a mock-interview platform. A candidate describes a job or a set of skills. The system prepares an interview, asks one question at a time, and keeps a transcript.
+PracticeRoom is a mock-interview platform. A signed-in candidate configures a job or skill interview, the system prepares timed questions, the candidate answers by voice or text (and code for coding rounds), and a transcript-based scorecard is produced.
 
 The product name in the interface is PracticeRoom. The npm packages are lowercase: `practice-room`, `@practice-room/web`, `@practice-room/api`, and `@practice-room/shared-types`.
 
-The interview engine runs in the NestJS API. Sessions live in memory. The React page creates a job or skill interview, shows the plan, requires a camera preview, speaks each question, accepts a spoken or typed answer plus code, and loads the report. Search still returns example links. Accounts, a database, and uploaded recordings are not built.
+**Current system documentation (what is built today):** [docs/current-state.md](docs/current-state.md)
+
+That file covers architecture, every major feature, technologies, SQLite auth and sessions, the Python AI worker, Kokoro voice, Whisper, interview timing, APIs, and what is still deferred. Prefer it over older notes below that still mention in-memory sessions without accounts.
 
 ## What a session does today
 

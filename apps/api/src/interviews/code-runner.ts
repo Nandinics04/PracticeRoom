@@ -35,10 +35,28 @@ export function inspectCandidateCode(code: string): CodeRun {
     }
 }
 
+function otherLanguage(source: string): string {
+    if (/#include|using namespace|int main\s*\(/.test(source)) {
+        return "C or C++";
+    }
+    if (/^\s*(def |import |from |print\(|class )/m.test(source) && !/\b(function|const|let|console)\b/.test(source)) {
+        return "Python";
+    }
+    return "";
+}
+
 export function runCandidateCode(code: string): string {
     const source = code.trim();
     if (!source) {
         return "";
+    }
+    const language = otherLanguage(source);
+    if (language) {
+        return [
+            "Candidate code:",
+            source.slice(0, 4000),
+            `This runner executes JavaScript only. It did not compile this ${language} code. That is not an error in the solution.`,
+        ].join("\n");
     }
     const run = inspectCandidateCode(source);
     return [

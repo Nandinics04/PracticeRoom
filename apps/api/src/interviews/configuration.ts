@@ -1,8 +1,18 @@
 import type {
+    CodingLanguage,
     InterviewConfiguration,
     JobInterviewInput,
     SkillInterviewInput,
 } from "@practice-room/shared-types";
+
+const CODING_LANGUAGES: CodingLanguage[] = ["cpp", "python", "typescript", "c"];
+
+function codingLanguage(input: { interviewType: string; codingLanguage?: string }): CodingLanguage | undefined {
+    if (input.interviewType !== "coding") {
+        return undefined;
+    }
+    return CODING_LANGUAGES.includes(input.codingLanguage as CodingLanguage) ? input.codingLanguage as CodingLanguage : "typescript";
+}
 
 export function toInterviewConfiguration(
     input: JobInterviewInput | SkillInterviewInput,
@@ -34,6 +44,7 @@ export function toInterviewConfiguration(
             materials,
             persona,
             practiceMode,
+            codingLanguage: codingLanguage(input),
             job:{
                 materials,
                 company,
@@ -61,5 +72,6 @@ return{
     materials,
     persona,
     practiceMode,
+    codingLanguage: codingLanguage(input),
 };
 }

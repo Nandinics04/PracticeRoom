@@ -52,7 +52,7 @@ export function Dashboard(props: {
                 <div className={view === "overview" ? "studio-grid" : "studio-grid single"}>
                     <div>
                         {view === "overview" ? <SessionLauncherCard {...props.launcher} /> : null}
-                        {view !== "brush" ? <SavedSessionsTable rooms={props.rooms} onOpen={props.onOpen} onRetake={props.onRetake} onDelete={props.onDelete} /> : null}
+                        {view !== "brush" ? <SavedSessionsTable rooms={props.rooms} onOpen={props.onOpen} onRetake={props.onRetake} onDelete={props.onDelete} preview={view === "overview"} onSeeAll={() => props.onView("rooms")} /> : null}
                         {view === "brush" ? <BrushUpChecklist topics={unique} done={done} onToggle={toggle} onPractice={props.onPracticeTopic} /> : null}
                     </div>
                     {view === "overview" ? (

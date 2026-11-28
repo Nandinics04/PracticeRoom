@@ -1,5 +1,5 @@
 import type { InterviewConfiguration, InterviewPlan, InterviewStatus, InterviewFeedback }  from "@practice-room/shared-types";
-import {codingQuestion, firstQuestion, type InterviewCursor, type InterviewTurn, type TurnAction} from "./interviewer";
+import {firstQuestion, type InterviewCursor, type InterviewTurn, type TurnAction} from "./interviewer";
 import { SessionStateMachine } from "./session-state";
 
 export type AnswerDelivery={
@@ -29,6 +29,7 @@ export type SessionRecord = {
     config: InterviewConfiguration;
     startedAt?: string | null;
     wrapUpUntil?: string | null;
+    startsAt?: string | null;
     ownerId?: string | null;
   };
 
@@ -40,6 +41,7 @@ export class InterviewSession{
     cursor: InterviewCursor={sectionIndex: 0, followUpUsed: false, introduced: false, replies: 0};
     startedAt: string | null=null;
     wrapUpUntil: string | null=null;
+    startsAt: string | null=null;
     ownerId: string | null=null;
     private readonly machine=new SessionStateMachine();
     private readonly config: InterviewConfiguration;
@@ -52,8 +54,21 @@ export class InterviewSession{
     assignOwner(ownerId: string){
         this.ownerId=ownerId;
     }
+    schedule(startsAt: string){
+        this.startsAt=startsAt;
+        if(this.status === "draft"){
+            this.status=this.machine.transition(this.status, "prepare");
+        }
+    }
+
+    fail(){
+        this.status=this.machine.transition(this.status, "fail");
+    }
+
     ready(plan: InterviewPlan){
-        this.status=this.machine.transition(this.status,"prepare");
+        if(this.status === "draft"){
+            this.status=this.machine.transition(this.status,"prepare");
+        }
         this.plan=plan;
         this.status=this.machine.transition(this.status,"plan_ready");
         return this.plan;
@@ -77,11 +92,15 @@ export class InterviewSession{
         if(!this.startedAt){
             this.startedAt=new Date().toISOString();
         }
-        const coding=this.config.interviewType === "coding";
-        const turn=coding ? codingQuestion(this.plan) : firstQuestion(this.plan);
-        if(coding){
-            this.cursor={sectionIndex: 0, followUpUsed: false, introduced: true, replies: 0};
-        }
+        const turn=firstQuestion(this.plan);
+        this.cursor={
+            ...this.cursor,
+            introduced: false,
+            sectionIndex: 0,
+            replies: 0,
+            followUpUsed: false,
+            sectionStartedAt: this.startedAt ?? new Date().toISOString(),
+        };
         this.transcript.push({sectionName: turn.sectionName, prompt: turn.prompt, answer: ""});
         return turn;
     }
@@ -123,11 +142,12 @@ export class InterviewSession{
           plan: this.plan,
           transcript: this.transcript,
           feedback: this.feedback,
-            cursor: this.cursor,
-            config: this.config,
-            startedAt: this.startedAt,
-            wrapUpUntil: this.wrapUpUntil,
-            ownerId: this.ownerId,
+          cursor: this.cursor,
+          config: this.config,
+          startedAt: this.startedAt,
+          wrapUpUntil: this.wrapUpUntil,
+          startsAt: this.startsAt,
+          ownerId: this.ownerId,
         };
       }
       
@@ -140,6 +160,7 @@ export class InterviewSession{
         session.cursor = { ...record.cursor };
         session.startedAt = record.startedAt ?? null;
         session.wrapUpUntil = record.wrapUpUntil ?? null;
+        session.startsAt = record.startsAt ?? null;
         session.ownerId = record.ownerId ?? null;
         return session;
       }

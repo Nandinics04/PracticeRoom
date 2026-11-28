@@ -10,6 +10,7 @@ export type InterviewType=
 export type ExperienceLevel = "entry" | "mid" | "senior";
 
 export type Difficulty = "easy" | "medium" | "hard";
+export type CodingLanguage = "cpp" | "python" | "typescript" | "c";
 export type InterviewerPersona = "coach" | "recruiter" | "bar_raiser";
 export type PracticeMode = "coach" | "real";
 export type JobContent={
@@ -35,6 +36,7 @@ export type JobInterviewInput={
     materials?: string;
     persona?: InterviewerPersona;
     practiceMode?: PracticeMode;
+    codingLanguage?: CodingLanguage;
 };
 export type SkillInterviewInput={
     mode: "skill";
@@ -48,6 +50,7 @@ export type SkillInterviewInput={
     materials?: string;
     persona?: InterviewerPersona;
     practiceMode?: PracticeMode;
+    codingLanguage?: CodingLanguage;
 }
 export type InterviewStatus= "draft" | "preparing" | "ready" | "live" | "completed" | "report_ready" | "failed";
 export type SessionEvent="prepare"| "plan_ready" | "start"| "end" | "report_ready" | "fail";
@@ -66,8 +69,8 @@ export type InterviewConfiguration={
     materials?: string;
     persona: InterviewerPersona;
     practiceMode: PracticeMode;
+    codingLanguage?: CodingLanguage;
 }
-
 export type PublicPlatform="leetcode" | "glassdoor" | "geeksforgeeks"| "medium"| "reddit"| "linkedin" | "AmbitionBox" | "ziprecruiter" | "stackoverflow" | "github" | "IGotAnOffer" | "Blind"| "CareerCup" | "company_site" | "supplied";
 export type ResearchSource={
     platform: PublicPlatform;
@@ -95,6 +98,7 @@ export type InterviewPlan={
     totalMinutes: number;
     sections: PlanSection[];
     sourceUrls: string[];
+    introMinutes?: number;
 };
 export type ScoreConfidence = "low" | "high"
 

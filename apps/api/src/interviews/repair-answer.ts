@@ -1,5 +1,4 @@
-import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { callRoom } from "./python-room";
 
 export function repairSpokenAnswer(body: {
     answer: string;
@@ -13,25 +12,8 @@ export function repairSpokenAnswer(body: {
     if (original.split(/\s+/).length < 8) {
         return Promise.resolve(original);
     }
-    const serviceDir = join(__dirname, "..", "..", "..", "ai-service");
-    return new Promise((resolve) => {
-        const child = spawn("python", ["repair_answer.py"], { cwd: serviceDir });
-        let stdout = "";
-        child.stdout.on("data", (chunk) => { stdout += chunk; });
-        child.on("error", () => resolve(original));
-        child.on("close", (code) => {
-            if (code !== 0) {
-                resolve(original);
-                return;
-            }
-            try {
-                const parsed = JSON.parse(stdout) as { answer?: string };
-                resolve(parsed.answer?.trim() || original);
-            } catch {
-                resolve(original);
-            }
-        });
-        child.stdin.write(JSON.stringify(body));
-        child.stdin.end();
-    });
+    return callRoom<{ answer?: string }>("repair", body, 5000).then(
+        (parsed) => parsed.answer?.trim() || original,
+        () => original,
+    );
 }

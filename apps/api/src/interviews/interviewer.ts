@@ -6,6 +6,8 @@ export type InterviewCursor={
     introduced?: boolean;
     replies?: number;
     wrapUp?: boolean;
+    sectionStartedAt?: string;
+    preparedNext?: string;
 }
 
 export type InterviewTurn={
@@ -25,6 +27,8 @@ export function wrapUpTurn(cursor: InterviewCursor): {cursor: InterviewCursor; t
             introduced: true,
             replies: 0,
             wrapUp: true,
+            sectionStartedAt: new Date().toISOString(),
+            preparedNext: cursor.preparedNext,
         },
         turn: {
             sectionName: "Wrap-up",
@@ -55,7 +59,7 @@ export function firstQuestion(plan: InterviewPlan): InterviewTurn {
     const topic = plan.title?.trim() || "this role";
     return{
         sectionName: "Introduction",
-        prompt: `Let's start with a short introduction for ${topic}. Tell me about a project you owned, and what your part in it was.`,
+        prompt: `Hi, thanks for joining. I'll let you start us off for ${topic}. Say hello, tell me your name, and a little about yourself.`,
         done: false,
     };
 }
@@ -63,16 +67,19 @@ export function firstQuestion(plan: InterviewPlan): InterviewTurn {
 export function nextTurn(
     plan: InterviewPlan,
     cursor: InterviewCursor,
-    decision: {action: TurnAction; prompt: string; hint?: string},
+    decision: {action: TurnAction; prompt: string; hint?: string; resetReplies?: boolean; preparedNext?: string},
 ): {cursor: InterviewCursor; turn: InterviewTurn}{
     if(decision.action === "stay"){
         const sectionName=cursor.introduced === false ? "Introduction" : plan.sections[cursor.sectionIndex].name;
+        const replies = decision.resetReplies ? 0 : (cursor.replies ?? 0) + 1;
         return{
             cursor: {
                 sectionIndex: cursor.sectionIndex,
                 followUpUsed: true,
                 introduced: cursor.introduced === false ? false : true,
-                replies: (cursor.replies ?? 0) + 1,
+                replies,
+                sectionStartedAt: cursor.sectionStartedAt ?? new Date().toISOString(),
+                preparedNext: decision.preparedNext ?? cursor.preparedNext,
             },
             turn:{
                 sectionName,
@@ -87,7 +94,14 @@ export function nextTurn(
     if(decision.action === "finish" || (!leavingIntro && nextIndex >= plan.sections.length)){
         const section=plan.sections[cursor.sectionIndex];
         return{
-            cursor: {sectionIndex: cursor.sectionIndex, followUpUsed: false, introduced: true, replies: 0},
+            cursor: {
+                sectionIndex: cursor.sectionIndex,
+                followUpUsed: false,
+                introduced: true,
+                replies: 0,
+                sectionStartedAt: new Date().toISOString(),
+                preparedNext: undefined,
+            },
             turn:{
                 sectionName: section.name,
                 prompt: decision.prompt,
@@ -98,7 +112,14 @@ export function nextTurn(
     }
     const next=plan.sections[nextIndex];
     return{
-        cursor: {sectionIndex: nextIndex, followUpUsed: false, introduced: true, replies: 0},
+        cursor: {
+            sectionIndex: nextIndex,
+            followUpUsed: false,
+            introduced: true,
+            replies: 0,
+            sectionStartedAt: new Date().toISOString(),
+            preparedNext: decision.preparedNext,
+        },
         turn:{
             sectionName: next.name,
             prompt: decision.prompt,

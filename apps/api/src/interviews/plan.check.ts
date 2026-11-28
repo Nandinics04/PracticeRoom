@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {toInterviewConfiguration} from "./configuration.ts";
-import {buildInterviewPlan} from "./plan.ts";
-import type {ResearchSource} from "@practice-rrom/shared-types";
+import {buildInterviewPlan, displaySections} from "./plan.ts";
+import type {ResearchSource} from "@practice-room/shared-types";
 
 const sources: ResearchSource[]=[
     {
@@ -33,7 +33,16 @@ const job= toInterviewConfiguration({
 const jobPlan=buildInterviewPlan(job, sources);
 assert.equal(jobPlan.title, "Software Engineer at Google");
 assert.equal(jobPlan.totalMinutes, 45);
-assert.equal(jobPlan.sections.reduce((sum,section)=>sum+section.minutes,0),45);
+assert.equal((jobPlan.introMinutes ?? 0) + jobPlan.sections.reduce((sum,section)=>sum+section.minutes,0),45);
+assert.equal(jobPlan.sections[1].name, "Core concepts");
+assert.ok(jobPlan.sections[1].minutes > jobPlan.sections[0].minutes);
+assert.ok(jobPlan.sections[1].minutes > jobPlan.sections[2].minutes);
+assert.deepEqual(displaySections(jobPlan).map((section) => section.name), [
+  "Introduction",
+  "Background",
+  "Core concepts",
+  "Follow-ups",
+]);
 assert.deepEqual(jobPlan.sections[0].questions[0].sourceUrls,[
     "https://reddit.com/example",
   "https://geeksforgeeks.org/example",

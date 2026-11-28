@@ -3,6 +3,7 @@ export type{
     InterviewType,
     ExperienceLevel,
     Difficulty,
+    CodingLanguage,
     InterviewerPersona,
     PracticeMode,
     JobContent,

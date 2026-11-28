@@ -3,6 +3,7 @@ import { SignedInGuard, type SignedRequest } from "./auth/signed-in.guard";
 import { randomUUID } from "node:crypto";
 import type { JobInterviewInput, SkillInterviewInput } from "@practice-room/shared-types";
 import { prepareInterview } from "./application/interview/prepare-interview";
+import { displaySections } from "./interviews/plan";
 import { toInterviewConfiguration } from "./interviews/configuration";
 import { planFromRequest } from "./interviews/plan-request";
 import { SESSION_REPOSITORY, type SessionRepository } from "./interviews/session-repository";
@@ -48,7 +49,25 @@ function practiceContext(session: InterviewSession) {
         context: notes.slice(0, 900),
         source: supplied ? "Your notes" : company ? "Company questions" : "Practice template",
         persona: config.persona,
+        codingLanguage: config.codingLanguage ?? "",
     };
+}
+
+function preloadQuestion(session: InterviewSession) {
+    if (!session.plan || session.interviewType === "coding") {
+        return "";
+    }
+    const index = session.status === "ready" || session.cursor.introduced === false ? 0 : session.cursor.sectionIndex + 1;
+    const prompt = session.plan.sections[index]?.questions[0]?.prompt ?? "";
+    return /^problem statement/i.test(prompt) ? "" : prompt;
+}
+
+function sessionTitle(session: InterviewSession) {
+    if (session.plan?.title) {
+        return session.plan.title;
+    }
+    const config = session.toRecord().config;
+    return config.job ? `${config.job.role} at ${config.job.company}` : config.skills.join(", ");
 }
 
 @Controller("interviews")
@@ -57,7 +76,7 @@ export class InterviewsController{
     constructor(@Inject(SESSION_REPOSITORY) private readonly store: SessionRepository) {}
 
     @Post()
-    async create(@Req() request: SignedRequest, @Body() body: (JobInterviewInput & {request?: string}) | (SkillInterviewInput & {request?: string}) | {request?: string; persona?: JobInterviewInput["persona"]; practiceMode?: JobInterviewInput["practiceMode"]; resume?: string; materials?: string}): Promise<{id: string; status: string; title?: string,interviewType: string; sections: {name: string, minutes:number}[]; sourceUrls: string[]; sectionName: string; prompt: string; practiceMode: string; persona: string}>{
+    async create(@Req() request: SignedRequest, @Body() body: (JobInterviewInput & {request?: string}) | (SkillInterviewInput & {request?: string}) | {request?: string; persona?: JobInterviewInput["persona"]; practiceMode?: JobInterviewInput["practiceMode"]; resume?: string; materials?: string}): Promise<{id: string; status: string; title?: string,interviewType: string; sections: {name: string, minutes:number}[]; sourceUrls: string[]; sectionName: string; prompt: string; practiceMode: string; persona: string; problem: string; durationMinutes: number; startsAt: string | null; preload: string}>{
         const note = body.request?.trim() ?? "";
         const input = "mode" in body && body.mode === "job"
             ? {...body, description: note ? `${body.description} The candidate asked: ${note}` : body.description}
@@ -67,12 +86,12 @@ export class InterviewsController{
                     request: note,
                     persona: body.persona,
                     practiceMode: body.practiceMode,
-                    resume: body.resume,
-                    materials: body.materials,
+                    resume: "resume" in body ? body.resume : undefined,
+                    materials: "materials" in body ? body.materials : undefined,
                 });
         let session;
         try {
-            session=await prepareInterview(toInterviewConfiguration(input), new LocalSearchProvider(), new McpQuestionAuthor());
+            session = await prepareInterview(toInterviewConfiguration(input), new LocalSearchProvider(), new McpQuestionAuthor());
         } catch (error) {
             const message = error instanceof Error ? error.message : "";
             if (message === "Company and role are required" || message === "At least one skill is required" || message === "Duration must be greater than 0") {
@@ -87,16 +106,17 @@ export class InterviewsController{
         return{
             id,
             status: session.status,
-            title: session.plan?.title,
+            title: sessionTitle(session),
             interviewType: session.interviewType,
-            sections: session.plan?.sections.map((section)=>({
-                name: section.name,
-                minutes: section.minutes,
-            })) ?? [],
+            sections: displaySections(session.plan),
             sourceUrls: session.plan?.sourceUrls ?? [],
             sectionName: opening?.sectionName ?? "",
             prompt: opening?.prompt ?? "",
             practiceMode: session.toRecord().config.practiceMode,
+            durationMinutes: session.toRecord().config.durationMinutes,
+            startsAt: null,
+            preload: preloadQuestion(session),
+            problem: codingProblem(session),
             ...practiceContext(session),
         };
     }
@@ -110,6 +130,9 @@ export class InterviewsController{
     @Post(":id/start")
     async start(@Req() request: SignedRequest, @Param("id") id: string){
         const session=this.store.getOwned(id, request.user.id);
+        if (session.status === "preparing" || session.status === "failed") {
+            throw new BadRequestException("The questions could not be prepared. Prepare the room again.");
+        }
         const turn = session?.start();
         this.store.save(id, session);
         return{
@@ -122,6 +145,8 @@ export class InterviewsController{
             startedAt: session?.startedAt,
             wrapUpUntil: session?.wrapUpUntil,
             done: turn?.done,
+            preload: preloadQuestion(session),
+            problem: codingProblem(session),
         }
     }
     @Post(":id/transcribe")
@@ -153,7 +178,7 @@ export class InterviewsController{
         const spoken=body.answer?.trim() ?? "";
         const code=body.code?.trim() ?? "";
         const config=session?.toRecord().config;
-        const heard=body.fromWhisper ? spoken : await repairSpokenAnswer({
+        const heard=session.interviewType === "coding" || body.fromWhisper ? spoken : await repairSpokenAnswer({
             answer: spoken,
             question: session?.transcript.at(-1)?.prompt ?? "",
             resume: config?.resume ?? "",
@@ -183,10 +208,12 @@ export class InterviewsController{
             prompt: turn?.prompt,
             hint: turn?.hint ?? "",
             done: turn?.done,
+            preload: preloadQuestion(session),
             answer: heard,
             durationMinutes: session?.toRecord().config.durationMinutes,
             startedAt: session?.startedAt,
             wrapUpUntil: session?.wrapUpUntil,
+            problem: codingProblem(session),
         }
     }
     @Post(":id/report")
@@ -223,24 +250,30 @@ export class InterviewsController{
         return{
             id,
             status: session?.status,
-            title: session.plan?.title,
+            title: sessionTitle(session),
             interviewType: session.interviewType,
-            sections:
-             session.plan?.sections.map((section)=>({
-                name: section.name,
-                minutes: section.minutes,
-             })) ?? [],
+            sections: displaySections(session.plan),
              sourceUrls: session.plan?.sourceUrls ?? [],
              sectionName: last?.sectionName || opening?.sectionName || "",
              prompt: last?.prompt || opening?.prompt || "",
              practiceMode: session.toRecord().config.practiceMode,
              durationMinutes: session.toRecord().config.durationMinutes,
              startedAt: session.startedAt,
+             startsAt: session.startsAt,
              wrapUpUntil: session.wrapUpUntil,
              feedback: session.feedback,
              said: saidTurns(session),
              done: session.status==="completed" || session.status=="report_ready",
+             preload: preloadQuestion(session),
+             problem: codingProblem(session),
              ...practiceContext(session),
         };
     }
+}
+
+function codingProblem(session: InterviewSession) {
+    if (session.interviewType !== "coding") {
+        return "";
+    }
+    return session.plan?.sections[0]?.questions[0]?.prompt ?? "";
 }

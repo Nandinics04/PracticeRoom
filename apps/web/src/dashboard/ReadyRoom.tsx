@@ -91,8 +91,9 @@ export function ReadyRoom({
     const round = ROUNDS[interviewType] ?? interviewType;
     const track = company || role || "Skill practice";
     const sectionLine = sections.length === 0
-        ? "No sections yet"
+        ? "Questions are being written from your form"
         : `${sections.length} Prepared Sections: ${sections.map((section, index) => `${index + 1}. ${section.name}`).join(" → ")}`;
+    const waiting = status === "preparing" || status === "failed";
 
     useEffect(() => watchVoiceEngine(setEngine), []);
 
@@ -103,6 +104,9 @@ export function ReadyRoom({
     }, []);
 
     useEffect(() => {
+        if (waiting) {
+            return;
+        }
         let stream: MediaStream | null = null;
         let timer = 0;
         let stop = false;
@@ -148,9 +152,12 @@ export function ReadyRoom({
             window.clearTimeout(timer);
             stream?.getTracks().forEach((track) => track.stop());
         };
-    }, []);
+    }, [waiting]);
 
     useEffect(() => {
+        if (waiting) {
+            return;
+        }
         let stream: MediaStream | null = null;
         let audio: AudioContext | null = null;
         let frame = 0;
@@ -200,7 +207,7 @@ export function ReadyRoom({
             stream?.getTracks().forEach((track) => track.stop());
             void audio?.close();
         };
-    }, []);
+    }, [waiting]);
 
     function testVoice() {
         unlockInterviewerVoice();

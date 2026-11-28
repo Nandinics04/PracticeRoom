@@ -9,9 +9,47 @@ const PILLS = [
     { id: "mixed", label: "Mixed" },
 ];
 
+function MinutesField({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+    const [text, setText] = useState(String(value));
+    const [focused, setFocused] = useState(false);
+    useEffect(() => {
+        if (!focused) {
+            setText(String(value));
+        }
+    }, [focused, value]);
+    return (
+        <input
+            type="number"
+            min={10}
+            value={focused ? text : String(value)}
+            onFocus={() => {
+                setFocused(true);
+                setText(String(value));
+            }}
+            onChange={(event) => {
+                const typed = event.target.value;
+                setText(typed);
+                const next = Number(typed);
+                if (Number.isFinite(next) && next >= 10) {
+                    onChange(next);
+                }
+            }}
+            onBlur={() => {
+                setFocused(false);
+                const next = Number(text);
+                const minutes = Number.isFinite(next) && next >= 10 ? Math.round(next) : Math.max(10, value);
+                onChange(minutes);
+                setText(String(minutes));
+            }}
+        />
+    );
+}
+
 export function SessionLauncherCard(props: {
     interviewType: string;
     onType: (value: string) => void;
+    codingLanguage: string;
+    onCodingLanguage: (value: string) => void;
     company: string;
     onCompany: (value: string) => void;
     role: string;
@@ -59,6 +97,21 @@ export function SessionLauncherCard(props: {
                     <button key={pill.id} type="button" className={props.interviewType === pill.id ? "pill on" : "pill"} onClick={() => props.onType(pill.id)}>{pill.label}</button>
                 ))}
             </div>
+            {props.interviewType === "coding" ? (
+                <div className="language-choice">
+                    <p>Which language do you want to code in?</p>
+                    <div className="pills">
+                        {[
+                            { id: "cpp", label: "C++" },
+                            { id: "python", label: "Python" },
+                            { id: "typescript", label: "TypeScript" },
+                            { id: "c", label: "C" },
+                        ].map((language) => (
+                            <button key={language.id} type="button" className={props.codingLanguage === language.id ? "pill on" : "pill"} onClick={() => props.onCodingLanguage(language.id)}>{language.label}</button>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
             <div className="launcher-fields">
                 <label className="company-field">
                     {props.mode === "job" ? "Company" : "Skills"}
@@ -97,7 +150,7 @@ export function SessionLauncherCard(props: {
                         <textarea rows={4} value={props.materials} placeholder="Paste a job description or the topics you want. Names in the notes are passed to Whisper." onChange={(event) => props.onMaterials(event.target.value)} />
                     </label>
                     <label>
-                        Resume
+                        Resume{props.interviewType === "technical" ? " (needed for a technical round)" : ""}
                         <input type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" onChange={(event) => props.onResume(event.target.files?.[0] ?? null)} />
                     </label>
                     {props.resumeName ? <p>{props.resumeName} is ready.</p> : null}
@@ -112,7 +165,7 @@ export function SessionLauncherCard(props: {
                         </label>
                         <label>
                             Minutes
-                            <input type="number" min={10} value={props.durationMinutes} onChange={(event) => props.onMinutes(Number(event.target.value))} />
+                            <MinutesField value={props.durationMinutes} onChange={props.onMinutes} />
                         </label>
                         <label>
                             Interviewer

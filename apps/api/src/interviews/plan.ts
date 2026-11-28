@@ -1,5 +1,5 @@
 import type {InterviewConfiguration, InterviewPlan, PlanSection, ResearchSource,} from "@practice-room/shared-types";
-import {interviewStrategyFor} from "./interview-strategy";
+import {allocateMinutes, interviewStrategyFor, introMinutesFor} from "./interview-strategy";
 import type { AuthoredQuestion } from "./question-author";
 import {rubricText} from "./rubric";
 
@@ -11,17 +11,17 @@ export function buildInterviewPlan(
 ): InterviewPlan {
     const strategy=interviewStrategyFor(config.interviewType);
     const names=strategy.sectionNames();
-    const base= Math.floor(config.durationMinutes / names.length);
-    const remainder=config.durationMinutes % names.length;
+    const introMinutes = introMinutesFor(config.interviewType, config.durationMinutes);
+    const sectionBudget = Math.max(names.length, config.durationMinutes - introMinutes);
+    const minutes = allocateMinutes(sectionBudget, strategy.sectionWeights());
     const sourceUrls=sources.map((source)=>source.url);
     const topic=config.job ? `${config.job.role} at ${config.job.company}`: config.skills.join(", ");
 
     const sections: PlanSection[]=names.map((name,index)=>{
-        const minutes=base+(index === names.length - 1 ? remainder : 0);
         const written = questions.find((question) => question.sectionName === name);
         return {
             name,
-            minutes,
+            minutes: minutes[index] ?? 1,
            
             questions:[
                 {
@@ -39,5 +39,18 @@ export function buildInterviewPlan(
         totalMinutes: config.durationMinutes,
         sections,
         sourceUrls,
+        ...(introMinutes > 0 ? { introMinutes } : {}),
     }
+}
+
+export function displaySections(plan: InterviewPlan | null | undefined): { name: string; minutes: number }[] {
+    if (!plan) {
+        return [];
+    }
+    const intro = plan.introMinutes ?? 0;
+    const body = plan.sections.map((section) => ({ name: section.name, minutes: section.minutes }));
+    if (intro > 0) {
+        return [{ name: "Introduction", minutes: intro }, ...body];
+    }
+    return body;
 }

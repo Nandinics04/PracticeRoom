@@ -5,7 +5,10 @@ export type CodingProblem = {
     output: string;
 };
 
-export function editorLanguage(topic: string) {
+export function editorLanguage(topic: string, chosen?: string) {
+    if (chosen === "cpp" || chosen === "python" || chosen === "typescript" || chosen === "c") {
+        return chosen;
+    }
     const text = topic.toLowerCase();
     if (/c\+\+|cpp/.test(text)) {
         return "cpp";
@@ -62,21 +65,20 @@ function field(text: string, label: string) {
 
 export function readCodingProblem(prompt: string): CodingProblem {
     const text = prompt.replace(/\r/g, "").trim();
-    const statement = field(text, "Problem statement");
+    const statement = (field(text, "Problem statement") || text)
+        .replace(/^Problem statement\s*/i, "")
+        .split(/\n(?:Example\b|Input:)/i)[0]
+        .trim();
     const constraints = field(text, "Constraints")
         .split("\n")
         .map((line) => line.replace(/^- /, "").trim())
-        .filter(Boolean);
-    const example = field(text, "Example");
-    const input = example.match(/Input:\s*(.+)/i)?.[1]?.trim() ?? "";
-    const output = example.match(/Output:\s*(.+)/i)?.[1]?.trim() ?? "";
-    if (statement && constraints.length > 0 && input && output) {
-        return { statement, constraints, input, output };
-    }
+        .filter((line) => line && !/^input:/i.test(line) && !/^output:/i.test(line));
+    const input = text.match(/Input:\s*([\s\S]*?)(?:\n\s*Output:|$)/i)?.[1]?.trim() ?? "";
+    const output = text.match(/Output:\s*(.+)/i)?.[1]?.trim() ?? "";
     return {
-        statement: text || "Prepare a new room. The question is written from the company, role, and skills you enter.",
-        constraints: [],
-        input: "",
-        output: "",
+        statement: statement || "Prepare a new room. The question is written from the company, role, and skills you enter.",
+        constraints,
+        input,
+        output,
     };
 }

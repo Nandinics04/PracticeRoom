@@ -10,7 +10,7 @@ const FILTERS = [
 
 function matches(room: RoomSummary, filter: string) {
     if (filter === "ready") {
-        return room.status === "ready" || room.status === "live";
+        return room.status === "ready" || room.status === "live" || room.status === "preparing";
     }
     if (filter === "draft") {
         return room.status === "draft" || room.status === "preparing";
@@ -22,6 +22,9 @@ function matches(room: RoomSummary, filter: string) {
 }
 
 function actionLabel(status: string) {
+    if (status === "preparing") {
+        return "View schedule";
+    }
     if (status === "ready" || status === "live") {
         return "Enter Live Room";
     }
@@ -36,23 +39,30 @@ export function SavedSessionsTable({
     onOpen,
     onRetake,
     onDelete,
+    preview,
+    onSeeAll,
 }: {
     rooms: RoomSummary[];
     onOpen: (id: string) => void;
     onRetake: (room: RoomSummary) => void;
     onDelete: (id: string) => void;
+    preview?: boolean;
+    onSeeAll?: () => void;
 }) {
     const [filter, setFilter] = useState("all");
-    const shown = rooms.filter((room) => matches(room, filter));
+    const matched = preview ? rooms : rooms.filter((room) => matches(room, filter));
+    const shown = preview ? matched.slice(0, 3) : matched;
     return (
         <section className="sessions-panel">
             <h2>Saved interviews</h2>
-            <div className="pills">
-                {FILTERS.map((item) => (
-                    <button key={item.id} type="button" className={filter === item.id ? "pill on" : "pill"} onClick={() => setFilter(item.id)}>{item.label}</button>
-                ))}
-            </div>
-            {shown.length === 0 ? <p className="studio-quiet">No rooms in this filter.</p> : (
+            {preview ? null : (
+                <div className="pills">
+                    {FILTERS.map((item) => (
+                        <button key={item.id} type="button" className={filter === item.id ? "pill on" : "pill"} onClick={() => setFilter(item.id)}>{item.label}</button>
+                    ))}
+                </div>
+            )}
+            {shown.length === 0 ? <p className="studio-quiet">{preview ? "No saved interviews yet." : "No rooms in this filter."}</p> : (
                 <ul className="session-list">
                     {shown.map((room) => (
                         <li key={room.id}>

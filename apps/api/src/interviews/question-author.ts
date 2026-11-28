@@ -1,8 +1,7 @@
 import type { InterviewConfiguration, ResearchSource } from "@practice-room/shared-types";
 import { interviewStrategyFor } from "./interview-strategy";
+import { callRoom } from "./python-room";
 import { practiceBrief } from "./rubric";
-import { spawn } from "node:child_process";
-import { join } from "node:path";
 
 export type AuthoredQuestion = {
   sectionName: string;
@@ -49,8 +48,9 @@ export class McpQuestionAuthor implements QuestionAuthor {
             persona: config.persona,
             practiceMode: config.practiceMode,
             skills: config.skills,
-            resume: (config.resume ?? "").slice(0, 500),
-            materials: config.materials ?? "",
+            codingLanguage: config.codingLanguage ?? "",
+            resume: (config.resume ?? "").slice(0, 1800),
+            materials: (config.materials ?? "").slice(0, 1500),
             brief: practiceBrief({
               company: config.job?.company,
               role: config.job?.role,
@@ -65,22 +65,7 @@ export class McpQuestionAuthor implements QuestionAuthor {
               excerpt: source.excerpt.slice(0, 400),
             })),
           });
-      const serviceDir = join(__dirname, "..", "..", "..", "ai-service");
-      const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn("python", ["prepare_questions.py"], { cwd: serviceDir });
-        let stdout = "";
-        let stderr = "";
-        child.stdout.on("data", (chunk) => { stdout += chunk; });
-        child.stderr.on("data", (chunk) => { stderr += chunk; });
-        child.on("error", reject);
-        child.on("close", (code) => {
-          if (code === 0) resolve(stdout);
-          else reject(new Error(stderr || `prepare_questions.py exited ${code}`));
-        });
-        child.stdin.write(request);
-        child.stdin.end();
-      });
-      return JSON.parse(output) as AuthoredQuestion[];
+      return callRoom<AuthoredQuestion[]>("prepare", JSON.parse(request) as Record<string, unknown>, 20000);
     }
   }
   

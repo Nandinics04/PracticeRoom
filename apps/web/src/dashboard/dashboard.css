@@ -148,6 +148,16 @@
   font-size: 1.05rem;
 }
 
+.language-choice {
+  margin: 0.8rem 0 0.2rem;
+}
+
+.language-choice p {
+  margin: 0 0 0.4rem;
+  color: #b9b3a8;
+  font-size: 0.82rem;
+}
+
 .pills {
   display: flex;
   flex-wrap: wrap;
@@ -212,6 +222,7 @@
 
 .launcher-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem 0.8rem;
   margin-top: 0.85rem;
@@ -224,6 +235,10 @@
 .ready-room .prepare {
   margin-top: 0.9rem;
   margin-left: auto;
+}
+
+.ready-room .prepare:disabled {
+  opacity: 0.45;
 }
 
 .materials {
@@ -302,6 +317,19 @@
 .session-copy span,
 .session-copy em {
   display: block;
+}
+
+.sessions-panel .see-saved {
+  display: block;
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: #d9d3c8;
+  text-align: center;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .session-actions {
