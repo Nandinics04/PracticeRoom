@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "../apiBase";
 
 const PILLS = [
     { id: "behavioral", label: "Behavioral" },
@@ -82,7 +83,7 @@ export function SessionLauncherCard(props: {
     const [open, setOpen] = useState(false);
     const [companyFocus, setCompanyFocus] = useState(false);
     useEffect(() => {
-        void props.api("http://localhost:3000/api/v1/interviews/companies").then(async (response) => {
+        void props.api(apiUrl("/api/v1/interviews/companies")).then(async (response) => {
             if (response.ok) {
                 setCompanies(await response.json() as string[]);
             }

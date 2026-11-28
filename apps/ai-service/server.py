@@ -12,6 +12,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from mcp.server.mcpserver import MCPServer
+from behavioral_graph import opening_behavioral_turn, plan_behavioral_interview, run_behavioral_turn
+from technical_graph import plan_technical_interview, run_technical_turn
 
 mcp = MCPServer("practice-room")
 
@@ -152,9 +154,10 @@ def typed_question(topic: str, section: str, interview_type: str, index: int) ->
     role = topic or "this role"
     by_type = {
         "behavioral": (
-            f"Quickly, what does your current or recent team look like for {role}?",
-            f"Tell me about a time you disagreed with someone while working as a {role}. What did you personally do?",
-            "What did you learn from that experience that changed how you work today?",
+            f"Thanks for joining for the {role} conversation. Give me a quick snapshot of your recent work and what drew you to this role.",
+            f"Pick one project from your recent work for {role}. What challenge came up, and what did you personally own?",
+            f"Tell me about a time you had to navigate a setback or tough tradeoff as a {role}. What did you do, and what changed?",
+            f"What are you looking for in your next team for {role}, and what questions do you have for me?",
         ),
         "coding": (
             f"Write a {role} function this role would use. State the arguments, the return value, one constraint, and one example whose output you have checked.",
@@ -302,7 +305,7 @@ PREPARE_FAST = """Return JSON only:
 Copy each sectionName exactly. One different question per section. Write from resume, skills, company, role, and jobRequirement. Never reuse a canned line.
 Match interviewType strictly. Never mix rounds.
 Technical (never behavioral): Background asks how one resume system moves data and why that shape. Core concepts asks a stack fundamental with one concrete input, the result, and a cost. Follow-ups asks how they would meet one jobRequirement when a detail is missing or a component fails. Forbidden phrases: "tell me about a time", "project you owned", "looking back", "what would you do differently".
-Behavioral: Past experience is a STAR situation from the resume. Reflection asks what changed in how they work. Ownership must be personal ("I"), not only "we".
+Behavioral: Four-section arc — Warm-up & Pitch, Resume Deep-Dive, Core Competency Scenarios, Culture Fit & Reverse Q&A. Author fresh STAR questions from resume/JD theme banks; never paste a fixed questionnaire. Ownership must be personal ("I"), not only "we".
 System design: Requirements first, then Design (APIs/data), then Tradeoffs (scale or failure). Seniority from experienceLevel.
 Coding: First prompt starts with "Problem statement", names the function in codingLanguage, Constraints, Example Input and Output. Later sections stay on that same function.
 HR: Motivation and Close stay warm. Career fit and growth, not algorithms.
@@ -506,7 +509,7 @@ def questions_from_model(payload: dict, redo: bool = False) -> list[dict]:
     request_body = {
         "model": model,
         "temperature": 0.4,
-        "max_tokens": 450,
+        "max_tokens": 800,
         "messages": [
             {"role": "system", "content": PREPARE_FAST},
             {"role": "user", "content": form_brief(payload) + note},
@@ -660,7 +663,8 @@ def form_brief(payload: dict) -> str:
         lines.append(f"notes: {materials[:240]}")
     sections = payload.get("sections") or []
     lines.append("sections: " + ", ".join(str(section) for section in sections))
-    lines.append("prepareVersion: interactive-live-6")
+    lines.append("prepareVersion: behavioral-arc-cot-8")
+    lines.append("behavioralArc: Warm-up&Pitch ~3m | Resume Deep-Dive ~8m | Core Competency ~14m | Culture Fit&Reverse Q&A ~5m")
     return "\n".join(lines)
 
 
@@ -729,6 +733,18 @@ def prepare_questions(payload: dict) -> list[dict]:
     sections = [str(section) for section in payload.get("sections") or []]
     topic = str(payload.get("topic") or "")
     interview_type = str(payload.get("interviewType") or "technical")
+    if interview_type == "technical":
+        blueprint = plan_technical_interview(payload)
+        if blueprint and questions_usable(payload, blueprint.get("questions") or []):
+            ready = blueprint["questions"]
+            write_plan_cache(payload, ready)
+            return ready
+    if interview_type == "behavioral":
+        blueprint = plan_behavioral_interview(payload)
+        if blueprint and questions_usable(payload, blueprint.get("questions") or []):
+            ready = blueprint["questions"]
+            write_plan_cache(payload, ready)
+            return ready
     try:
         questions = questions_from_model(payload)
     except (RuntimeError, urllib.error.URLError, TimeoutError):
@@ -752,7 +768,7 @@ def prepare_questions(payload: dict) -> list[dict]:
     shaped = []
     for index, question in enumerate(questions):
         prompt = str(question.get("prompt") or "")
-        if interview_type == "coding" and prompt.lower().startswith("problem statement"):
+        if from_model or (interview_type == "coding" and prompt.lower().startswith("problem statement")):
             shaped.append(question)
         else:
             shaped.append({**question, "prompt": shape_for_form(prompt, payload, index)})
@@ -1594,7 +1610,8 @@ def introduction_reply(payload: dict) -> dict | None:
     company = str(payload.get("company") or "").strip()
     seat = f" for the {role} interview at {company}" if role and company else f" for the {role} interview" if role else " for this interview"
     mine = f"{hello} {name}, I'm your interviewer{seat}, and it's nice to meet you." if name else f"{hello}. I'm your interviewer{seat}, and it's nice to meet you."
-    nxt = opening_task(payload)
+    planned = prepared_question(payload)
+    nxt = short_spoken(planned) if planned else opening_task(payload)
     content = looks_like_content(answer)
     if probes >= 1 or content:
         thanks = f"Thanks{(' ' + name) if name else ''}."
@@ -1725,9 +1742,15 @@ def quick_reply(payload: dict) -> dict:
 def model_reply(payload: dict) -> dict:
     if str(payload.get("phase") or "") == "seed_next":
         return seed_next_question(payload)
+    if str(payload.get("interviewType") or "") == "behavioral":
+        if str(payload.get("phase") or "") == "greeting":
+            return opening_behavioral_turn(payload)
+        return run_behavioral_turn(payload)
     intro = introduction_reply(payload)
     if intro:
         return intro
+    if str(payload.get("interviewType") or "") == "technical":
+        return run_technical_turn(payload)
     load_local_env()
     key = os.environ.get("PRACTICE_ROOM_LLM_KEY", "").strip()
     if not key:
@@ -2114,7 +2137,7 @@ def as_figures(rows: object) -> list[dict]:
     return figures
 
 
-def score_with_model(transcript: list[dict], rubric: str, interview_type: str = "", job_description: str = "", resume: str = "") -> dict:
+def score_with_model(transcript: list[dict], rubric: str, interview_type: str = "", job_description: str = "", resume: str = "", rubric_notes: list[str] | None = None) -> dict:
     load_local_env()
     key = os.environ.get("PRACTICE_ROOM_LLM_KEY", "").strip()
     if not key:
@@ -2132,6 +2155,7 @@ def score_with_model(transcript: list[dict], rubric: str, interview_type: str = 
                 "interviewType": interview_type,
                 "jobDescription": job_description,
                 "resume": resume,
+                "rubricNotes": rubric_notes or [],
                 "transcript": transcript,
             })},
         ],
@@ -2217,11 +2241,11 @@ def with_measured(report: dict, transcript: list[dict]) -> dict:
 
 
 @mcp.tool()
-def write_report(transcript: list[dict], rubric: str = "", interviewType: str = "", jobDescription: str = "", resume: str = "") -> dict:
+def write_report(transcript: list[dict], rubric: str = "", interviewType: str = "", jobDescription: str = "", resume: str = "", rubricNotes: list[str] | None = None) -> dict:
     """Score this interview on its own transcript."""
     if rubric:
         try:
-            report = score_with_model(transcript, rubric, interviewType, jobDescription, resume)
+            report = score_with_model(transcript, rubric, interviewType, jobDescription, resume, rubricNotes)
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             report = length_report(transcript)
     else:

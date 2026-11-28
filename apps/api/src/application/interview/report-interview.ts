@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 
 export interface ReportGenerator {
-    generate(transcript: TranscriptEntry[], context?: {rubric: string; interviewType?: string; jobDescription?: string; resume?: string}): Promise<InterviewFeedback>;
+    generate(transcript: TranscriptEntry[], context?: {rubric: string; interviewType?: string; jobDescription?: string; resume?: string; rubricNotes?: string[]}): Promise<InterviewFeedback>;
 }
 
 export class MockReportGenerator implements ReportGenerator {
@@ -36,6 +36,7 @@ export class MockReportGenerator implements ReportGenerator {
         interviewType: session.interviewType,
         jobDescription: config.job?.description ?? config.skills.join(", "),
         resume: config.resume ?? "",
+        rubricNotes: session.cursor.rubricNotes ?? [],
     });
     if (session.feedback) {
       return session.feedback;
@@ -45,13 +46,14 @@ export class MockReportGenerator implements ReportGenerator {
   }
 
   export class McpReportGenerator implements ReportGenerator {
-    async generate(transcript: TranscriptEntry[], context?: {rubric: string; interviewType?: string; jobDescription?: string; resume?: string}): Promise<InterviewFeedback> {
+    async generate(transcript: TranscriptEntry[], context?: {rubric: string; interviewType?: string; jobDescription?: string; resume?: string; rubricNotes?: string[]}): Promise<InterviewFeedback> {
       const request = JSON.stringify({
         transcript,
         rubric: context?.rubric ?? "",
         interviewType: context?.interviewType ?? "",
         jobDescription: context?.jobDescription ?? "",
         resume: context?.resume ?? "",
+        rubricNotes: context?.rubricNotes ?? [],
       });
       const serviceDir = join(__dirname, "..", "..", "..", "..", "ai-service");
       const output = await new Promise<string>((resolve, reject) => {

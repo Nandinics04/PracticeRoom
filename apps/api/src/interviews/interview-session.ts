@@ -84,7 +84,7 @@ export class InterviewSession{
         this.status=this.machine.transition(this.status, "end");
     }
 
-    start(): InterviewTurn{
+    start(opening?: InterviewTurn, introduced = false): InterviewTurn{
         if(!this.plan){
             throw new Error("Prepare the interview before starting")
         }
@@ -92,10 +92,10 @@ export class InterviewSession{
         if(!this.startedAt){
             this.startedAt=new Date().toISOString();
         }
-        const turn=firstQuestion(this.plan);
+        const turn=opening ?? firstQuestion(this.plan);
         this.cursor={
             ...this.cursor,
-            introduced: false,
+            introduced,
             sectionIndex: 0,
             replies: 0,
             followUpUsed: false,

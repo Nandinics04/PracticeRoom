@@ -9,7 +9,7 @@ import { planFromRequest } from "./interviews/plan-request";
 import { SESSION_REPOSITORY, type SessionRepository } from "./interviews/session-repository";
 import { LocalSearchProvider } from "./interviews/search-provider";
 import { reportInterview, McpReportGenerator } from "./application/interview/report-interview";
-import { answerInterview } from "./application/interview/answer-interview";
+import { answerInterview, openingLine } from "./application/interview/answer-interview";
 import { McpQuestionAuthor } from "./interviews/question-author";
 import { McpAnswerEvaluator } from "./application/interview/answer-interview";
 import { firstQuestion } from "./interviews/interviewer";
@@ -102,7 +102,12 @@ export class InterviewsController{
         const id=randomUUID();
         session.assignOwner(request.user.id);
         this.store.save(id,session);
-        const opening = session.plan ? firstQuestion(session.plan) : undefined;
+        const opening = session.interviewType === "behavioral" && session.plan?.sections[0]
+            ? {
+                sectionName: session.plan.sections[0].name,
+                prompt: session.plan.sections[0].questions[0]?.prompt ?? "",
+            }
+            : session.plan ? firstQuestion(session.plan) : undefined;
         return{
             id,
             status: session.status,
@@ -133,7 +138,14 @@ export class InterviewsController{
         if (session.status === "preparing" || session.status === "failed") {
             throw new BadRequestException("The questions could not be prepared. Prepare the room again.");
         }
-        const turn = session?.start();
+        const opening = session.interviewType === "behavioral" && session.plan?.sections[0]
+            ? {
+                sectionName: session.plan.sections[0].name,
+                prompt: session.plan.sections[0].questions[0]?.prompt || (await openingLine(session)).prompt,
+                done: false,
+            }
+            : undefined;
+        const turn = session?.start(opening, session.interviewType === "behavioral");
         this.store.save(id, session);
         return{
             status: session?.status,
@@ -207,6 +219,7 @@ export class InterviewsController{
             sectionName: turn?.sectionName,
             prompt: turn?.prompt,
             hint: turn?.hint ?? "",
+            starStatus: turn?.starStatus,
             done: turn?.done,
             preload: preloadQuestion(session),
             answer: heard,

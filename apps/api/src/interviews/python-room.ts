@@ -16,6 +16,10 @@ let nextId = 1;
 const pending = new Map<number, Waiter>();
 
 function serviceDir() {
+    const fromEnv = process.env.PRACTICE_ROOM_AI_SERVICE?.trim();
+    if (fromEnv) {
+        return fromEnv;
+    }
     return join(__dirname, "..", "..", "..", "ai-service");
 }
 

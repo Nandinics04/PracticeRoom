@@ -7,6 +7,8 @@
 
 This document describes **what is built and running in code today**. Older files under `docs/` (PRD, HLD, schema, README intro) may still describe an earlier in-memory / no-accounts slice. Prefer this file for the live system.
 
+**Whole-system design graphs (Mermaid):** [architecture/design-graph.md](architecture/design-graph.md)
+
 ---
 
 ## 1. What PracticeRoom is
@@ -457,6 +459,16 @@ Configure `apps/ai-service/.env` with Groq base URL, model, and key (never commi
 - API: http://localhost:3000/api/v1/health  
 
 Python scripts are spawned by Nest; do not leave `python server.py` blocking stdio for checks.
+
+### Production (Fly.io)
+
+Always-on public URL (UI + API + Python worker + SQLite volume):
+
+- **App:** https://hirepro-nandini.fly.dev/  
+- **Health:** https://hirepro-nandini.fly.dev/api/v1/health  
+- **Deploy guide:** [docs/deploy.md](deploy.md) (`fly.toml`, `Dockerfile` target `runtime-prod`, region `sin`)
+
+Local Docker compose serves the same stack at http://localhost:8080 (not `:5173`).
 
 Checks from repo root often use:
 

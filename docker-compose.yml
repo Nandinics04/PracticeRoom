@@ -1,0 +1,33 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime-api
+    env_file:
+      - .env
+    environment:
+      PORT: "3000"
+      PRACTICE_ROOM_DATA_DIR: /data
+      PRACTICE_ROOM_AI_SERVICE: /app/apps/ai-service
+      # Browser hits nginx on :8080 (same-origin /api). Also allow Vite local if needed.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080,http://localhost:5173}
+    volumes:
+      - practice_room_data:/data
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  practice_room_data:

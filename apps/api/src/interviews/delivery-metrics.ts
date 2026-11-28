@@ -62,7 +62,7 @@ export function applyMeasuredReport(report: InterviewFeedback, transcript: Trans
     const delivery: ScoreFigure[] = timed.length === 0 ? [] : [
         figure("Speaking pace", wpm >= 120 && wpm <= 150 ? 100 : Math.max(0, 100 - Math.abs(wpm - 135) * 1.5), `${wpm} words per minute. A steady pace is 120 to 150.`, wpm < 105 || wpm > 165),
         figure("Thinking time", think >= 1.5 && think <= 4 ? 100 : Math.max(0, 100 - Math.abs(think - 2.75) * 12), `${think} seconds after the question before the answer started. A composed start is 1.5 to 4 seconds.`, think < 1.5 || think > 8),
-        figure("Answer length", seconds >= 45 && seconds <= 120 ? 100 : Math.max(0, 100 - Math.abs(seconds - 80) / 2), `About ${seconds} seconds per answer. Under 20 seconds is thin, and over 150 seconds is hard to follow.`, seconds < 20 || seconds > 150),
+        figure("Answer length", seconds >= 45 && seconds <= 150 ? 100 : Math.max(0, 100 - Math.abs(seconds - 90) / 2), `About ${seconds} seconds per answer. Under 30 seconds is shallow, and over 210 seconds (3.5 min) is rambling.`, seconds < 30 || seconds > 210),
         figure("Filler words", Math.max(0, 100 - Math.round(perHundred * 8)), `${fillers} fillers, ${perHundred} per 100 words.`, perHundred > 4),
     ];
     const presence: ScoreFigure[] = [];

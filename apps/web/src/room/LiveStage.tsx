@@ -18,6 +18,7 @@ export function LiveStage({
     sectionName,
     prompt,
     hint,
+    starStatus,
     mode,
     answer,
     onAnswer,
@@ -56,6 +57,7 @@ export function LiveStage({
     sectionName: string;
     prompt: string;
     hint: string;
+    starStatus?: { situation: boolean; task: boolean; action: boolean; result: boolean };
     mode: "preparing" | "speaking" | "listening" | "refining" | "done";
     answer: string;
     onAnswer: (value: string) => void;
@@ -92,7 +94,7 @@ export function LiveStage({
         name: section.name,
         label: section.minutes > 0 ? `${section.name} · ${section.minutes}m` : section.name,
     }));
-    if (!timed.some((section) => section.name === "Introduction")) {
+    if (interviewType !== "behavioral" && !timed.some((section) => section.name === "Introduction")) {
         timed.unshift({ name: "Introduction", label: "Introduction" });
     }
     if (sectionName === "Wrap-up" && !timed.some((section) => section.name === "Wrap-up")) {
@@ -192,6 +194,18 @@ export function LiveStage({
                     </div>
                     <div className={mode === "speaking" || mode === "preparing" ? "orb on" : "orb"} aria-hidden="true" />
                     <p className="spoken-question">{prompt || "The interviewer speaks first."}</p>
+                    {starStatus ? (
+                        <div className="star-pills" aria-label="STAR coverage">
+                            {([
+                                ["S", starStatus.situation, "Situation"],
+                                ["T", starStatus.task, "Task"],
+                                ["A", starStatus.action, "Action"],
+                                ["R", starStatus.result, "Result"],
+                            ] as const).map(([letter, hit, label]) => (
+                                <span key={letter} title={label} className={hit ? "hit" : ""}>{letter}</span>
+                            ))}
+                        </div>
+                    ) : null}
                     {hint ? <p className="coach-hint">Coach. {hint}</p> : null}
                 </section>
                 <aside className="pip-card">

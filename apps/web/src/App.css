@@ -1245,6 +1245,32 @@ textarea {
   color: #d9d3c8;
 }
 
+.star-pills {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.star-pills span {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid #34343c;
+  border-radius: 999px;
+  background: #1b1b20;
+  color: #8d887f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.star-pills span.hit {
+  border-color: #3dce8d;
+  background: #143226;
+  color: #b7f3d4;
+}
+
 .live-error {
   color: #f3c7be;
 }

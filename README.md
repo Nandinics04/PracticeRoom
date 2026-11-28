@@ -4,7 +4,8 @@ PracticeRoom is a mock-interview platform. A signed-in candidate configures a jo
 
 The product name in the interface is PracticeRoom. The npm packages are lowercase: `practice-room`, `@practice-room/web`, `@practice-room/api`, and `@practice-room/shared-types`.
 
-**Current system documentation (what is built today):** [docs/current-state.md](docs/current-state.md)
+**Current system documentation (what is built today):** [docs/current-state.md](docs/current-state.md)  
+**Full design graphs (deployment, LLM, state, data):** [docs/architecture/design-graph.md](docs/architecture/design-graph.md)
 
 That file covers architecture, every major feature, technologies, SQLite auth and sessions, the Python AI worker, Kokoro voice, Whisper, interview timing, APIs, and what is still deferred. Prefer it over older notes below that still mention in-memory sessions without accounts.
 
@@ -66,6 +67,25 @@ PracticeRoom/
 | [docs/api/http.md](docs/api/http.md) | Health, create, start, answer, and report |
 | [docs/database/schema.md](docs/database/schema.md) | The in-memory session, and the tables planned for later |
 | [docs/decisions](docs/decisions) | Why the session is in memory, why search is a provider, and why scores quote answers |
+
+## Deploy (production)
+
+**Live app:** [https://hirepro-nandini.fly.dev/](https://hirepro-nandini.fly.dev/)
+
+Always-on Fly.io deployment (UI + API + Python worker + SQLite volume). Full steps, secrets, and troubleshooting: **[docs/deploy.md](docs/deploy.md)**.
+
+```powershell
+& "$env:USERPROFILE\.fly\bin\flyctl.exe" deploy -a hirepro-nandini
+```
+
+Local Docker only (your PC must stay on):
+
+```powershell
+copy .env.example .env
+docker compose up --build
+```
+
+Open `http://localhost:8080` (not Vite `:5173`).
 
 ## Setup
 

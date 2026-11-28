@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { cancelInterviewer, prepareInterviewerVoice, speakAsInterviewer, unlockInterviewerVoice } from "./interviewer-voice";
+import { apiUrl } from "./apiBase";
 
 prepareInterviewerVoice("No problem at all.");
 prepareInterviewerVoice("That makes sense.");
@@ -47,12 +48,20 @@ type CreatedInterview={
     source?: string;
     persona?: string;
     codingLanguage?: string;
+    prompt?: string;
+};
+type StarStatus={
+    situation: boolean;
+    task: boolean;
+    action: boolean;
+    result: boolean;
 };
 type InterviewTurn={
     status: string;
     sectionName: string;
     prompt: string;
     hint?: string;
+    starStatus?: StarStatus;
     done: boolean;
 };
 type SpokenLine={
@@ -302,7 +311,6 @@ export default function App(){
     const cameraAllowed=useRef(false);
     const releaseCameraRef=useRef<() => void>(() => {});
     const speakToken=useRef(0);
-    const voiceReadyFor=useRef("");
     const spokenPrompt=useRef("");
     const keepListening=useRef(false);
     const recognitionRef=useRef<{ stop: () => void } | null>(null);
@@ -620,7 +628,7 @@ export default function App(){
         return () => window.clearTimeout(timer);
     }, [place, result?.status, result?.interviewType, turn?.sectionName, turn?.prompt, turn?.done, voicePhase, code, answer]);
     useEffect(() => {
-        void api("http://localhost:3000/api/v1/auth/me").then(async (response) => {
+        void api(apiUrl("/api/v1/auth/me")).then(async (response) => {
             if (response.ok) {
                 const next = await response.json() as Account;
                 setAccount(next);
@@ -843,29 +851,8 @@ export default function App(){
         }
     }
     releaseCameraRef.current=releaseCamera;
-    async function shareScreen() {
-        setError("");
-        const current = screenRef.current?.srcObject;
-        if (current instanceof MediaStream) {
-          current.getTracks().forEach((track) => track.stop());
-        }
-        try {
-          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          if (screenRef.current) {
-            screenRef.current.srcObject = stream;
-          }
-          const track = stream.getVideoTracks()[0];
-          track.onended = () => {
-            if (screenRef.current) {
-              screenRef.current.srcObject = null;
-            }
-          };
-        } catch {
-          setError("Screen sharing was cancelled.");
-        }
-      }
       async function loadInterviews(){
-        const response=await api("http://localhost:3000/api/v1/interviews");
+        const response=await api(apiUrl("/api/v1/interviews"));
          if(response.ok){
             setInterviews(await response.json());
          }
@@ -878,7 +865,7 @@ export default function App(){
           stopListening();
           releaseCamera();
         }
-        const response = await api(`http://localhost:3000/api/v1/interviews/${id}`, { method: "DELETE" });
+        const response = await api(apiUrl(`/api/v1/interviews/${id}`), { method: "DELETE" });
         if (!response.ok) {
           setError(`Delete failed: ${response.status}`);
           return;
@@ -895,7 +882,7 @@ export default function App(){
         void loadInterviews();
       }
       async function refreshScheduled(id: string) {
-        const response = await api(`http://localhost:3000/api/v1/interviews/${id}`);
+        const response = await api(apiUrl(`/api/v1/interviews/${id}`));
         if (!response.ok) {
           return;
         }
@@ -928,7 +915,7 @@ export default function App(){
       }
       async function openInterview(id: string) {
         setError("");
-        const response = await api(`http://localhost:3000/api/v1/interviews/${id}`);
+        const response = await api(apiUrl(`/api/v1/interviews/${id}`));
         if (!response.ok) {
           setError("That interview is no longer available.");
           return;
@@ -992,13 +979,14 @@ export default function App(){
           source: saved.source,
           persona: saved.persona,
           codingLanguage: saved.codingLanguage,
+          prompt: saved.prompt,
         });
         const held = saved.status === "preparing" || saved.status === "failed";
         if (saved.status === "ready" || held) {
           setPlace("briefing");
           if (saved.status === "ready") {
             unlockInterviewerVoice();
-            const opening = spokenLine(openingLine(saved.title || ""));
+            const opening = spokenLine(saved.interviewType === "behavioral" && saved.prompt ? saved.prompt : openingLine(saved.title || ""));
             prepareInterviewerVoice(opening);
             if (saved.preload) {
               prepareInterviewerVoice(spokenLine(saved.preload));
@@ -1096,7 +1084,7 @@ export default function App(){
             ...(materials.trim() ? { materials: materials.trim() } : {}),
         };
         try {
-        const response=await api("http://localhost:3000/api/v1/interviews", {
+        const response=await api(apiUrl("/api/v1/interviews"), {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(body),
@@ -1122,20 +1110,25 @@ export default function App(){
             return;
         }
         const codingRoom = result.interviewType === "coding";
-        const greeting = spokenLine(openingLine(result.title || ""));
+        const behavioralRoom = result.interviewType === "behavioral";
+        const greeting = behavioralRoom
+            ? (result.prompt ? spokenLine(result.prompt) : "")
+            : spokenLine(openingLine(result.title || ""));
         if (codingRoom && !code.trim()) {
             setCode(starterFor(editorLanguage(result.title || "", result.codingLanguage)));
         }
         setPlace("room");
-        setTurn({ status: "live", sectionName: "Introduction", prompt: greeting, done: false });
-        setLines([{ role: "interviewer", text: greeting }]);
+        setTurn({ status: "live", sectionName: behavioralRoom ? (result.sections[0]?.name || "Warm-up & Pitch") : "Introduction", prompt: greeting, done: false });
+        setLines(greeting ? [{ role: "interviewer", text: greeting }] : []);
         setResult({ ...result, status: "live" });
-        beginSpeech(greeting);
+        if (greeting) {
+            beginSpeech(greeting);
+        }
         setError("");
         setPending("start");
         try {
         const response=await api(
-            `http://localhost:3000/api/v1/interviews/${result.id}/start`,
+            apiUrl(`/api/v1/interviews/${result.id}/start`),
             {method: "POST"},
         );
         if(!response.ok){
@@ -1146,11 +1139,14 @@ export default function App(){
             return;
         }
         const next=await response.json();
-        const shown = next.sectionName === "Introduction" && typeof next.prompt === "string" && next.prompt.trim() ? spokenLine(next.prompt) : greeting;
+        const shown = (next.sectionName === "Introduction" || result.interviewType === "behavioral") && typeof next.prompt === "string" && next.prompt.trim() ? spokenLine(next.prompt) : greeting;
         if (typeof next.problem === "string" && next.problem.trim()) {
             setProblemText(next.problem);
         }
-        setTurn({ ...next, prompt: shown, sectionName: next.sectionName || "Introduction" });
+        setTurn({ ...next, prompt: shown, sectionName: next.sectionName || (result.interviewType === "behavioral" ? (result.sections[0]?.name || "Warm-up & Pitch") : "Introduction") });
+        if (result.interviewType === "behavioral" && shown && shown !== greeting) {
+            beginSpeech(shown);
+        }
         if (typeof next.preload === "string" && next.preload.trim()) {
             prepareInterviewerVoice(spokenLine(next.preload));
         }
@@ -1182,7 +1178,7 @@ export default function App(){
         let fromWhisper=false;
         if(recording && result){
             try{
-                const response=await api(`http://localhost:3000/api/v1/interviews/${result.id}/transcribe`, {
+                const response=await api(apiUrl(`/api/v1/interviews/${result.id}/transcribe`), {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
@@ -1223,7 +1219,7 @@ export default function App(){
         }
         try {
         const response=await api(
-            `http://localhost:3000/api/v1/interviews/${result.id}/answer`,
+            apiUrl(`/api/v1/interviews/${result.id}/answer`),
             {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -1303,7 +1299,7 @@ export default function App(){
         setPending("report");
         try {
         const response=await api(
-            `http://localhost:3000/api/v1/interviews/${result.id}/report`,
+            apiUrl(`/api/v1/interviews/${result.id}/report`),
             {method: "POST"},
         );
         if(!response.ok){
@@ -1340,7 +1336,7 @@ export default function App(){
         setError("");
         setPending("end");
         try {
-            const response=await api(`http://localhost:3000/api/v1/interviews/${result.id}/end`, { method: "POST" });
+            const response=await api(apiUrl(`/api/v1/interviews/${result.id}/end`), { method: "POST" });
             if(!response.ok){
                 setError(await response.text() || `End failed: ${response.status}`);
                 return;
@@ -1363,7 +1359,7 @@ export default function App(){
         }
         setAuthPending(true);
         try {
-            const response = await api(`http://localhost:3000/api/v1/auth/${authMode === "signup" ? "signup" : "login"}`, {
+            const response = await api(apiUrl(`/api/v1/auth/${authMode === "signup" ? "signup" : "login"}`), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(authMode === "signup" ? { name: draftName, email, password } : { email, password }),
@@ -1389,7 +1385,7 @@ export default function App(){
         setError("");
         setAuthPending(true);
         try {
-            const response = await api("http://localhost:3000/api/v1/auth/profile", {
+            const response = await api(apiUrl("/api/v1/auth/profile"), {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ targetRole: role, experienceLevel, goal }),
@@ -1412,7 +1408,7 @@ export default function App(){
         cancelInterviewer();
         releaseCamera();
         setVoicePhase("");
-        await api("http://localhost:3000/api/v1/auth/logout", { method: "POST" });
+        await api(apiUrl("/api/v1/auth/logout"), { method: "POST" });
         setAccount(null);
         setPlace("lobby");
         setUserName("");
@@ -1534,7 +1530,8 @@ export default function App(){
         const closing = turn?.sectionName === "Wrap-up";
         const end = closing && result.wrapUpUntil ? Date.parse(result.wrapUpUntil) + timePaused : budgetEnd;
         const remaining = end - now;
-        const text = `${Math.max(0, Math.floor(remaining / 60000))}:${String(Math.max(0, Math.ceil((remaining % 60000) / 1000))).padStart(2, "0")}`;
+        const totalSeconds = Math.max(0, Math.floor(remaining / 1000));
+        const text = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
         if (minutes === 10 && closing && now > budgetEnd) {
             return remaining > 0 ? `Extra time for this answer: ${text}` : "Extra time for this answer.";
         }
@@ -1681,7 +1678,7 @@ export default function App(){
         setCodeRunning(true);
         setError("");
         try {
-            const response = await api(`http://localhost:3000/api/v1/interviews/${result.id}/code`, {
+            const response = await api(apiUrl(`/api/v1/interviews/${result.id}/code`), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ code }),
@@ -1717,6 +1714,7 @@ export default function App(){
             sectionName={turn?.sectionName || "Introduction"}
             prompt={turn && !turn.done ? (interviewerPreparing ? "Preparing the question." : withVoice) : turn?.done ? "That completes the interview." : "Take your seat. The interviewer speaks first."}
             hint={result?.practiceMode === "coach" && turn?.hint && !turn.done ? turn.hint : ""}
+            starStatus={result?.interviewType === "behavioral" && result?.practiceMode === "coach" && !turn?.done ? turn?.starStatus : undefined}
             mode={liveMode}
             answer={answer}
             onAnswer={(value) => {

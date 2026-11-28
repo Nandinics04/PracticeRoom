@@ -55,7 +55,11 @@ export function SavedSessionsTable({
     return (
         <section className="sessions-panel">
             <h2>Saved interviews</h2>
-            {preview ? null : (
+            {preview ? (
+                onSeeAll ? (
+                    <button type="button" className="pill" onClick={onSeeAll}>See all</button>
+                ) : null
+            ) : (
                 <div className="pills">
                     {FILTERS.map((item) => (
                         <button key={item.id} type="button" className={filter === item.id ? "pill on" : "pill"} onClick={() => setFilter(item.id)}>{item.label}</button>

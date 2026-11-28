@@ -1,0 +1,34 @@
+# PracticeRoom production on Fly.io — one machine, public HTTPS URL
+# Deploy: fly launch --no-deploy  (or fly apps create) then fly deploy
+# Secrets: fly secrets set PRACTICE_ROOM_LLM_KEY=... PRACTICE_ROOM_LLM_BASE=... PRACTICE_ROOM_LLM_MODEL=...
+
+app = "practice-room"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+  build-target = "runtime-prod"
+
+[env]
+  NODE_ENV = "production"
+  COOKIE_SECURE = "true"
+  PORT = "3000"
+  PRACTICE_ROOM_DATA_DIR = "/data"
+  PRACTICE_ROOM_AI_SERVICE = "/app/apps/ai-service"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048mb"
+
+[mounts]
+  source = "practice_room_data"
+  destination = "/data"
+  initial_size = "1gb"

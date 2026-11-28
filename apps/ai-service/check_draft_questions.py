@@ -38,7 +38,7 @@ methodology = draft_questions(
 assert "speech recognition" not in methodology[0]["prompt"].lower()
 behavioral = draft_questions(
     "Software Engineer at Google",
-    ["Introduction", "Past experience", "Reflection"],
+    ["Warm-up & Pitch", "Resume Deep-Dive", "Core Competency Scenarios", "Culture Fit & Reverse Q&A"],
     interviewType="behavioral",
 )
 technical = draft_questions(
@@ -47,6 +47,6 @@ technical = draft_questions(
     interviewType="technical",
 )
 assert behavioral[0]["prompt"] != technical[0]["prompt"]
-assert "tell me about a time" in behavioral[0]["prompt"].lower()
-assert "walk me through" not in behavioral[0]["prompt"].lower()
+assert len(behavioral) == 4
+assert "walk me through how you would solve a coding problem" not in behavioral[0]["prompt"].lower()
 print("draft questions ok")

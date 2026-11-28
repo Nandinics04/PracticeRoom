@@ -48,22 +48,26 @@ class TechnicalStrategy implements InterviewStrategy{
 }
 class BehavioralStrategy implements InterviewStrategy{
     sectionNames(): string[]{
-        return ["Introduction", "Past experience", "Reflection"];
+        return ["Warm-up & Pitch", "Resume Deep-Dive", "Core Competency Scenarios", "Culture Fit & Reverse Q&A"];
     }
     sectionWeights(): number[]{
-        return [0.2, 0.5, 0.3];
+        // Exact 3 / 8 / 14 / 5 on a 30-minute behavioral round (scaled for other durations).
+        return [3, 8, 14, 5];
     }
     introShare(): number{
         return 0;
     }
     followUp(sectionName: string): string{
-        if (sectionName === "Past experience") {
-            return "Claim to test: they name a personal action with I, not only we, and a measurable result.";
+        if (sectionName === "Resume Deep-Dive") {
+            return "Claim to test: they name their personal action with I, not only we, and a measurable result.";
         }
-        if (sectionName === "Reflection") {
-            return "Claim to test: they name one change in how they work after that situation.";
+        if (sectionName === "Core Competency Scenarios") {
+            return "Claim to test: they describe a concrete past event with clear individual action and outcome.";
         }
-        return "Claim to test: they give a concrete role or team setup, not a slogan.";
+        if (sectionName === "Culture Fit & Reverse Q&A") {
+            return "Claim to test: they show genuine curiosity about the team, role, and engineering culture.";
+        }
+        return "Claim to test: they give a clear career narrative aligned with the target role.";
     }
 }
 class SystemDesignStrategy implements InterviewStrategy{
